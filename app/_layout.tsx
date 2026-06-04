@@ -1,0 +1,78 @@
+import { useEffect } from 'react';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { View, ActivityIndicator } from 'react-native';
+import { useUserStore } from '@/stores/userStore';
+import { useTrainingStore } from '@/stores/trainingStore';
+import { supabase, getUserProfile, getActiveTrainingPlan } from '@/lib/supabase';
+import '../global.css';
+
+export default function RootLayout() {
+  const { session, isLoading, setSession, setIsLoading, setProfile, setIsOnboarded, setDevMode } = useUserStore();
+  const { setPlan } = useTrainingStore();
+
+  useEffect(() => {
+    if (!supabase) {
+      setDevMode(true);
+      setIsOnboarded(false);
+      setIsLoading(false);
+      return;
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) {
+        loadUserData(session.user.id);
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session?.user) {
+        loadUserData(session.user.id);
+      } else {
+        setProfile(null);
+        setIsOnboarded(false);
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function loadUserData(userId: string) {
+    const profile = await getUserProfile(userId);
+    if (profile) {
+      setProfile(profile);
+      setIsOnboarded(true);
+      const plan = await getActiveTrainingPlan(userId);
+      if (plan) setPlan(plan);
+    } else {
+      setIsOnboarded(false);
+    }
+    setIsLoading(false);
+  }
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-[#0A0A0A] items-center justify-center">
+        <ActivityIndicator size="large" color="#E8C547" />
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <StatusBar style="light" />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(onboarding)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="training/[sessionId]" />
+      </Stack>
+    </>
+  );
+}

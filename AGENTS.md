@@ -1,3 +1,693 @@
-# Expo HAS CHANGED
+# AGENT.md — Kensei
 
-Read the exact versioned docs at https://docs.expo.dev/versions/v55.0.0/ before writing any code.
+Este archivo es la fuente de verdad del proyecto. Todo agente de desarrollo que trabaje en este repositorio debe leerlo completo antes de escribir cualquier línea de código y luego del cambio actualizarlo para que mis agentes tengan el contexto completo de mi aplicacion y de lo que se ha realizado y que se puede realizar
+
+
+---
+
+## Descripcion del proyecto
+
+Kensei es una aplicacion movil de entrenamiento en artes marciales desarrollada con React Native y Expo. Su enfoque inicial es boxeo y MMA. La app incluye temporizadores de ronda configurables, planes de entrenamiento personalizados generados por un agente de IA local, historial de sesiones y un sistema de recomendaciones que adapta el plan segun el perfil del usuario obtenido en un cuestionario inicial.
+
+El nombre "Kensei" proviene del japones y significa guerrero experto o maestro de combate.
+
+---
+
+## Stack tecnico
+
+| Capa | Tecnologia |
+|---|---|
+| Framework | React Native con Expo (SDK 52+) |
+| Lenguaje | TypeScript estricto |
+| Navegacion | Expo Router (file-based routing) |
+| Estado global | Zustand |
+| Datos asincronos | TanStack Query v5 |
+| Base de datos | Supabase (PostgreSQL) |
+| Backend | Supabase (Auth + Database + Storage) |
+| Estilos | NativeWind (Tailwind para React Native) |
+| IA / Agente | Ollama (API local, gratuita) |
+| SDK Supabase | `@supabase/supabase-js` |
+
+### Reglas del stack
+
+- Usar TypeScript en todos los archivos. No usar `any` salvo casos excepcionales documentados.
+- No instalar librerias fuera del stack definido sin justificacion explicita en un comentario.
+- Todos los estilos van con NativeWind. No usar `StyleSheet.create` salvo animaciones nativas.
+- Toda interaccion con la base de datos va a traves del cliente de Supabase, nunca con queries directas.
+- El agente de IA usa Ollama. No integrar ninguna API de pago sin confirmacion explicita.
+
+---
+
+## Estructura de carpetas
+
+```
+kensei/
+├── app/
+│   ├── (onboarding)/
+│   │   ├── _layout.tsx
+│   │   ├── welcome.tsx              # Pantalla de bienvenida inicial
+│   │   └── questionnaire.tsx        # Cuestionario de perfil (7 preguntas)
+│   ├── (tabs)/
+│   │   ├── _layout.tsx
+│   │   ├── home.tsx                 # Dashboard: plan del dia y racha
+│   │   ├── timer.tsx                # Temporizador libre configurable
+│   │   ├── training.tsx             # Plan de entrenamiento activo
+│   │   ├── history.tsx              # Historial de sesiones
+│   │   └── profile.tsx              # Perfil y configuracion
+│   ├── training/
+│   │   └── [sessionId].tsx          # Vista de sesion activa paso a paso
+│   └── _layout.tsx
+├── components/
+│   ├── ui/                          # Componentes reutilizables (Button, Card, Badge, etc.)
+│   ├── timer/                       # Componentes del temporizador
+│   ├── training/                    # Componentes de sesion y ejercicios
+│   └── onboarding/                  # Componentes del cuestionario
+├── lib/
+│   ├── agent.ts                     # Logica de llamada a Ollama
+│   ├── supabase.ts                  # Cliente y helpers de Supabase
+│   └── utils.ts                     # Funciones utilitarias generales
+├── stores/
+│   ├── userStore.ts                 # Estado global del perfil de usuario
+│   ├── timerStore.ts                # Estado del temporizador
+│   └── trainingStore.ts             # Estado del plan activo
+├── types/
+│   └── index.ts                     # Todos los tipos e interfaces TypeScript
+├── constants/
+│   └── index.ts                     # Colores, tiempos por defecto, textos fijos
+└── AGENT.md                         # Este archivo
+```
+
+---
+
+## Supabase — Base de datos y backend
+
+### Configuracion del cliente (lib/supabase.ts)
+
+```typescript
+// lib/supabase.ts
+
+import { createClient } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    storage: AsyncStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+});
+```
+
+### Variables de entorno (.env)
+
+```
+EXPO_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key
+OLLAMA_BASE_URL=http://localhost:11434   # URL del servidor Ollama local
+```
+
+### Esquema de base de datos (SQL para ejecutar en Supabase)
+
+```sql
+-- Perfil del usuario (uno por usuario autenticado)
+CREATE TABLE user_profile (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  discipline TEXT NOT NULL CHECK (discipline IN ('boxing', 'mma', 'both')),
+  goal TEXT NOT NULL CHECK (goal IN ('compete', 'fitness', 'selfdefense', 'beginner')),
+  level TEXT NOT NULL CHECK (level IN ('beginner', 'intermediate', 'advanced')),
+  days_per_week INTEGER NOT NULL CHECK (days_per_week BETWEEN 1 AND 7),
+  equipment TEXT NOT NULL CHECK (equipment IN ('none', 'basic', 'full')),
+  fitness_level TEXT NOT NULL CHECK (fitness_level IN ('low', 'medium', 'high')),
+  injuries TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Sesiones de entrenamiento completadas
+CREATE TABLE sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  date DATE NOT NULL,
+  discipline TEXT NOT NULL,
+  duration_minutes INTEGER NOT NULL,
+  rounds_completed INTEGER,
+  notes TEXT,
+  rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+  plan_session_day TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Planes generados por el agente
+CREATE TABLE training_plans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  generated_at TIMESTAMPTZ DEFAULT NOW(),
+  plan_json JSONB NOT NULL,
+  active BOOLEAN DEFAULT TRUE
+);
+
+-- Indice: solo un plan activo por usuario
+CREATE UNIQUE INDEX one_active_plan_per_user
+  ON training_plans (user_id)
+  WHERE active = TRUE;
+
+-- Row Level Security: cada usuario solo ve sus propios datos
+ALTER TABLE user_profile ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE training_plans ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "usuario ve su perfil" ON user_profile
+  FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "usuario ve sus sesiones" ON sessions
+  FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "usuario ve sus planes" ON training_plans
+  FOR ALL USING (auth.uid() = user_id);
+```
+
+### Helpers de base de datos
+
+Todas las operaciones de base de datos van en `lib/supabase.ts`. No hacer llamadas a `supabase` directamente desde componentes o stores.
+
+```typescript
+// Ejemplos de helpers a implementar en lib/supabase.ts
+
+export async function getUserProfile(): Promise<UserProfile | null>
+export async function saveUserProfile(profile: Omit<UserProfile, 'id' | 'user_id' | 'created_at'>): Promise<void>
+export async function saveSession(session: NewSession): Promise<void>
+export async function getSessions(limit?: number): Promise<Session[]>
+export async function saveTrainingPlan(plan: TrainingPlan): Promise<void>
+export async function getActiveTrainingPlan(): Promise<TrainingPlan | null>
+```
+
+---
+
+## Agente de recomendaciones con Ollama (lib/agent.ts)
+
+Ollama permite correr modelos de lenguaje de forma local y gratuita. Expone una API REST compatible con el formato de OpenAI, por lo que la integracion es simple sin necesidad de SDK adicional.
+
+### Modelo recomendado
+
+Usar `llama3.2` o `mistral` segun lo que el usuario tenga descargado en su instancia de Ollama. El modelo se configura en las variables de entorno o en `constants/index.ts`.
+
+```typescript
+// constants/index.ts
+export const OLLAMA_MODEL = 'llama3.2';       // cambiar segun modelo disponible
+export const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434';
+```
+
+### Implementacion (lib/agent.ts)
+
+```typescript
+// lib/agent.ts
+
+import { OLLAMA_BASE_URL, OLLAMA_MODEL } from '@/constants';
+import { UserProfile, TrainingPlan } from '@/types';
+
+const SYSTEM_PROMPT = `
+Eres Kensei, un entrenador experto en boxeo y MMA con mas de 15 anos de experiencia 
+formando atletas de todos los niveles, desde principiantes absolutos hasta competidores 
+profesionales. Tu rol es generar planes de entrenamiento personalizados, precisos y seguros.
+
+Cuando recibas un perfil de usuario, genera un plan semanal completo en formato JSON 
+con la siguiente estructura exacta:
+
+{
+  "plan_name": "string",
+  "duration_weeks": number,
+  "sessions_per_week": number,
+  "weekly_structure": [
+    {
+      "day": "string",
+      "session_type": "string",
+      "duration_minutes": number,
+      "rounds": number,
+      "round_duration_seconds": number,
+      "rest_seconds": number,
+      "exercises": [
+        {
+          "name": "string",
+          "description": "string",
+          "duration_seconds": number,
+          "sets": number,
+          "reps": number | null
+        }
+      ],
+      "focus": "string",
+      "intensity": "low" | "medium" | "high"
+    }
+  ],
+  "recommendations": ["string"],
+  "warnings": ["string"]
+}
+
+Reglas:
+- Adapta la intensidad, duracion y ejercicios al nivel y condicion fisica del usuario.
+- Si hay lesiones, evita ejercicios que las agraven y mencionalas en warnings.
+- Para principiantes, prioriza tecnica sobre intensidad.
+- Para nivel avanzado, incluye trabajo de sparring y combinaciones complejas.
+- El campo warnings debe incluir avisos de seguridad relevantes al perfil.
+- El campo recommendations debe incluir consejos de alimentacion, descanso y progresion.
+- Responde UNICAMENTE con el JSON. Sin texto adicional, sin explicaciones,
+  sin bloques de codigo markdown, sin caracteres extra antes o despues del JSON.
+`;
+
+export async function generateTrainingPlan(profile: UserProfile): Promise<TrainingPlan> {
+  const userMessage = `
+    Genera un plan de entrenamiento para este usuario:
+    - Nombre: ${profile.name}
+    - Disciplina: ${profile.discipline}
+    - Objetivo: ${profile.goal}
+    - Nivel: ${profile.level}
+    - Dias disponibles por semana: ${profile.days_per_week}
+    - Equipamiento disponible: ${profile.equipment}
+    - Condicion fisica actual: ${profile.fitness_level}
+    - Lesiones o limitaciones: ${profile.injuries ?? 'Ninguna'}
+  `;
+
+  const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: OLLAMA_MODEL,
+      stream: false,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Ollama no esta disponible. Verifica que el servidor este corriendo en ${OLLAMA_BASE_URL}`);
+  }
+
+  const data = await response.json();
+  const raw: string = data?.message?.content ?? '';
+
+  try {
+    // Limpiar posibles bloques markdown que el modelo incluya de todas formas
+    const clean = raw.replace(/```json|```/g, '').trim();
+    return JSON.parse(clean) as TrainingPlan;
+  } catch {
+    throw new Error('El agente devolvio una respuesta invalida. Intenta de nuevo.');
+  }
+}
+```
+
+### Requisito para el usuario
+
+Ollama debe estar corriendo localmente en la maquina de desarrollo. Comandos de referencia:
+
+```bash
+# Instalar Ollama desde https://ollama.com
+# Descargar el modelo
+ollama pull llama3.2
+
+# Iniciar el servidor (queda corriendo en localhost:11434)
+ollama serve
+```
+
+Para produccion o distribucion de la app, se debera reemplazar Ollama por un backend propio que exponga el mismo endpoint, o migrar a una API de pago. Este cambio solo requiere actualizar `OLLAMA_BASE_URL`.
+
+---
+
+## Tipos TypeScript principales
+
+```typescript
+// types/index.ts
+
+export type Discipline = 'boxing' | 'mma' | 'both';
+export type Goal = 'compete' | 'fitness' | 'selfdefense' | 'beginner';
+export type Level = 'beginner' | 'intermediate' | 'advanced';
+export type Equipment = 'none' | 'basic' | 'full';
+export type FitnessLevel = 'low' | 'medium' | 'high';
+export type Intensity = 'low' | 'medium' | 'high';
+
+export interface UserProfile {
+  id: string;                  // UUID de Supabase
+  user_id: string;             // UUID del usuario autenticado
+  name: string;
+  discipline: Discipline;
+  goal: Goal;
+  level: Level;
+  days_per_week: number;
+  equipment: Equipment;
+  fitness_level: FitnessLevel;
+  injuries: string | null;
+  created_at: string;
+}
+
+export interface Exercise {
+  name: string;
+  description: string;
+  duration_seconds: number;
+  sets: number;
+  reps: number | null;
+}
+
+export interface PlanSession {
+  day: string;
+  session_type: string;
+  duration_minutes: number;
+  rounds: number;
+  round_duration_seconds: number;
+  rest_seconds: number;
+  exercises: Exercise[];
+  focus: string;
+  intensity: Intensity;
+}
+
+export interface TrainingPlan {
+  plan_name: string;
+  duration_weeks: number;
+  sessions_per_week: number;
+  weekly_structure: PlanSession[];
+  recommendations: string[];
+  warnings: string[];
+}
+
+export interface Session {
+  id: string;
+  user_id: string;
+  date: string;
+  discipline: string;
+  duration_minutes: number;
+  rounds_completed?: number;
+  notes?: string;
+  rating?: number;
+  plan_session_day?: string;
+  created_at: string;
+}
+
+export type NewSession = Omit<Session, 'id' | 'user_id' | 'created_at'>;
+
+export interface TimerConfig {
+  rounds: number;
+  round_duration: number;   // segundos
+  rest_duration: number;    // segundos
+  warning_seconds: number;  // aviso antes del fin de ronda
+}
+```
+
+---
+
+## Cuestionario inicial (7 preguntas)
+
+El cuestionario se presenta en la pantalla `(onboarding)/questionnaire.tsx`. Cada pregunta es un paso dentro de un stepper. Al terminar, se guarda el perfil en Supabase y se llama al agente para generar el plan.
+
+| # | Pregunta | Opciones |
+|---|---|---|
+| 1 | Como te llamas? | Campo de texto libre |
+| 2 | Que disciplina quieres entrenar? | Boxeo / MMA / Ambas |
+| 3 | Cual es tu objetivo principal? | Competir / Ponerme en forma / Defensa personal / Aprender desde cero |
+| 4 | Cual es tu nivel actual? | Principiante (nunca he entrenado) / Intermedio (entreno ocasionalmente) / Avanzado (entreno regularmente) |
+| 5 | Cuantos dias por semana puedes entrenar? | 2 dias / 3 dias / 4-5 dias / Todos los dias |
+| 6 | Que equipamiento tienes disponible? | Sin equipamiento / Guantes y costal / Gimnasio completo |
+| 7 | Como describes tu condicion fisica actual? | Baja (me canso rapido) / Media / Alta (buena base cardio) |
+| + | Tienes alguna lesion o limitacion fisica? | Campo de texto opcional |
+
+---
+
+## Temporizador (stores/timerStore.ts)
+
+El timer es independiente del plan. El usuario puede usarlo libremente desde la tab de timer o iniciarlo desde una sesion del plan activo.
+
+```typescript
+// Valores por defecto del temporizador
+const DEFAULT_TIMER: TimerConfig = {
+  rounds: 3,
+  round_duration: 180,    // 3 minutos
+  rest_duration: 60,      // 1 minuto
+  warning_seconds: 10,    // aviso 10 segundos antes del fin de ronda
+};
+```
+
+Estados del timer: `idle` | `running` | `resting` | `warning` | `finished`
+
+Al terminar una sesion con el timer, la app ofrece guardar la sesion en el historial de Supabase.
+
+---
+
+## Flujo de navegacion
+
+```
+Primera vez
+    └── (onboarding)/welcome
+            └── (onboarding)/questionnaire
+                    └── Agente genera plan → guarda en Supabase
+                            └── (tabs)/home
+
+Desde home
+    ├── Ver sesion del dia → training/[sessionId]
+    │       └── Timer activo → Guardar en historial (Supabase) → home
+    ├── Timer libre → (tabs)/timer
+    ├── Historial → (tabs)/history
+    └── Perfil y regenerar plan → (tabs)/profile
+```
+
+---
+
+## Paleta de colores (constants/index.ts)
+
+```typescript
+export const COLORS = {
+  background: '#0A0A0A',      // Negro profundo
+  surface: '#141414',          // Superficie de cards
+  border: '#2A2A2A',           // Bordes sutiles
+  primary: '#E8C547',          // Amarillo dorado (accion principal)
+  primaryDark: '#C4A32E',      // Amarillo oscuro (hover/pressed)
+  text: '#F5F5F5',             // Texto principal
+  textMuted: '#888888',        // Texto secundario
+  success: '#4CAF50',          // Verde (sesion completada)
+  warning: '#FF9800',          // Naranja (aviso de tiempo)
+  danger: '#F44336',           // Rojo (error o tiempo agotado)
+  rest: '#2196F3',             // Azul (periodo de descanso)
+};
+```
+
+---
+
+## Reglas generales para el agente de desarrollo
+
+1. Leer este archivo completo antes de empezar cualquier tarea.
+2. No crear archivos fuera de la estructura de carpetas definida sin justificacion.
+3. Cada componente debe tener sus tipos definidos en `types/index.ts` o localmente si son exclusivos del componente.
+4. Toda interaccion con Supabase va en `lib/supabase.ts`. No importar el cliente de supabase en componentes o stores directamente.
+5. Las llamadas a Ollama van exclusivamente en `lib/agent.ts`.
+6. Manejar siempre los estados de carga y error en pantallas que llamen al agente o a Supabase.
+7. No integrar ninguna API de IA de pago. El agente usa Ollama.
+8. Todos los textos visibles al usuario van en espanol.
+9. Al terminar una tarea, indicar que archivos fueron creados o modificados.
+
+---
+
+## Estado actual del proyecto (checklists por tarea)
+
+### 1. Estructura base del proyecto
+- [x] Inicializar Expo con blank-typescript template
+- [x] Configurar TypeScript estricto con path alias `@/`
+- [x] Instalar NativeWind v4 + Tailwind v4 + react-native-css-interop
+- [x] Configurar `global.css`, `metro.config.js`, `nativewind-env.d.ts`
+- [x] Configurar `app.json` (dark theme, scheme, bundle IDs)
+- [x] Crear estructura de carpetas completa
+
+### 2. Expo Router (file-based routing)
+- [x] Instalar expo-router y dependencias asociadas
+- [x] Configurar `package.json` con `main: "expo-router/entry"`
+- [x] Crear root layout `app/_layout.tsx`
+- [x] Crear layouts anidados: `(auth)`, `(onboarding)`, `(tabs)`
+- [x] Crear `app/index.tsx` como punto de entrada con redirect logic
+
+### 3. Tipos e interfaces (types/index.ts)
+- [x] Tipos: Discipline, Goal, Level, Equipment, FitnessLevel, Intensity, TimerStatus
+- [x] Interfaces: UserProfile, Exercise, PlanSession, TrainingPlan, Session, NewSession, TimerConfig, QuestionnaireData
+- [x] ~~Declaracion para `*.css` modules~~ (no necesaria con NativeWind v4)
+
+### 4. Constantes (constants/index.ts)
+- [x] Paleta de colores completa (fondo oscuro, primary dorado)
+- [x] Configuracion por defecto del temporizador
+- [x] Configuracion de Ollama (modelo, base URL)
+
+### 5. Cliente Supabase + helpers (lib/supabase.ts)
+- [x] Crear cliente Supabase con AsyncStorage para sesion
+- [x] Helper: `getUserProfile()`
+- [x] Helper: `saveUserProfile()`
+- [x] Helper: `saveSession()`
+- [x] Helper: `getSessions()`
+- [x] Helper: `saveTrainingPlan()`
+- [x] Helper: `getActiveTrainingPlan()`
+- [x] Fallback para dev mode (placeholders si no hay .env)
+
+### 6. Stores Zustand
+- [x] `userStore`: profile, session, isLoading, isOnboarded, isDevMode, signOut
+- [x] `timerStore`: config, status, currentRound, timeLeft, totalTimeLeft
+- [x] `trainingStore`: plan, currentSessionIndex, getCurrentSession
+
+### 7. Sistema de Autenticacion
+- [x] Pantalla de login con email/password
+- [x] Pantalla de registro con email/password
+- [x] Modo desarrollo (skip auth) para desarrollo local
+- [x] Manejo de sesion via `onAuthStateChange`
+- [x] Root layout verifica sesion al inicio (splash screen)
+- [x] `app/index.tsx` redirige segun auth + onboarding state
+- [x] Cierre de sesion desde pantalla de perfil
+
+### 8. Pantallas de onboarding
+- [x] `welcome.tsx`: Pantalla de bienvenida con texto descriptivo
+- [x] `questionnaire.tsx`: Stepper de 7 preguntas
+- [x] Soporte para modo dev (datos mock) y modo real (Supabase + Ollama)
+- [x] Plan por defecto si Ollama falla
+- [x] Campo opcional de lesiones/limitaciones
+
+### 9. Integracion con agente Ollama (lib/agent.ts)
+- [x] System prompt con instrucciones para generar plan JSON
+- [x] Funcion `generateTrainingPlan()` con llamada a `{base_url}/api/chat`
+- [x] Limpieza de bloques markdown en respuesta
+- [x] Manejo de errores (servidor caido, JSON invalido)
+
+### 10. Tab Home
+- [x] Saludo personalizado con nombre del usuario
+- [x] Tarjeta de sesion del dia (seleccionada segun dia de la semana)
+- [x] Estado vacio si no hay sesion
+- [x] Resumen del plan activo
+- [x] Recomendaciones del plan
+- [x] Pull-to-refresh
+
+### 11. Temporizador
+- [x] Pantalla con display de tiempo grande
+- [x] Estados: idle, running, resting, warning, finished
+- [x] Configuracion de rondas, duracion y descanso (+/-)
+- [x] Boton de inicio/detener
+- [x] Pantalla de completado con icono
+- [x] Iconos Ionicons en configuracion
+
+### 12. Plan de entrenamiento (tabs/training)
+- [x] Vista de plan semanal con todas las sesiones
+- [x] Badge de intensidad (alta/media/baja)
+- [x] Navegacion a detalle de sesion
+- [x] Boton para regenerar plan via Ollama
+- [x] Advertencias del plan
+
+### 13. Vista de sesion activa (training/[sessionId])
+- [x] Header con tipo, dia, enfoque
+- [x] Info chips (duracion, rondas, intensidad)
+- [x] Lista de ejercicios con series, repeticiones, duracion
+
+### 14. Historial de sesiones
+- [x] Lista plana de sesiones desde Supabase
+- [x] Icono por disciplina
+- [x] Rating con estrellas
+- [x] Estado vacio con icono
+- [x] Pull-to-refresh
+
+### 15. Pantalla de perfil
+- [x] Avatar placeholder con iniciales
+- [x] Datos del perfil con iconos
+- [x] Plan activo (o estado vacio)
+- [x] Regenerar plan via Ollama
+- [x] Reiniciar onboarding con confirmacion
+- [x] Cerrar sesion (solo en modo real)
+
+### 16. Mejoras de UI/UX
+- [x] Iconos Ionicons en tabs y todas las pantallas
+- [x] Pull-to-refresh en home e historial
+- [x] Alert de confirmacion para reiniciar onboarding
+- [x] Loading states con ActivityIndicator
+- [x] Modo desarrollo sin conexion a Supabase
+
+---
+
+### 17. Guardar sesion al terminar timer
+- [x] Pantalla post-entrenamiento con rating (1-5 estrellas)
+- [x] Campo de notas opcional
+- [x] Guardar en Supabase via `saveSession()`
+- [x] Estado de guardado exitoso con icono
+- [x] Opcion de descartar
+- [x] Soporte para modo dev (no llama a Supabase)
+
+### 18. Iniciar timer desde sesion de entrenamiento
+- [x] Boton "Iniciar entrenamiento" en `[sessionId].tsx`
+- [x] Configura timer con rondas, duracion y descanso de la sesion
+- [x] Badge en timer mostrando nombre de la sesion activa
+- [x] `startFromSession()` action en timerStore
+- [x] Navegacion automatica a la tab de timer
+
+### 19. Cargar plan activo desde Supabase al iniciar
+- [x] `getActiveTrainingPlan()` se ejecuta en el root layout
+- [x] Plan cargado en trainingStore antes de mostrar la UI
+
+---
+
+### 20. Sistema de diseno y componentes reutilizables
+- [x] `components/ui/Button.tsx`: Boton con variantes (primary, secondary, outline, danger, ghost) y tamanos
+- [x] `components/ui/Card.tsx`: Tarjeta reutilizable con acento de color opcional
+- [x] `components/ui/Badge.tsx`: Badge de estado (intensidad alta/media/baja, info, success, warning)
+- [x] `components/ui/ScreenHeader.tsx`: Header consistente para pantallas
+- [x] `components/ui/ProgressBar.tsx`: Barra de progreso y StepDots
+- [x] `components/ui/EmptyState.tsx`: Estado vacio con icono, texto y accion
+- [x] `components/ui/Divider.tsx`: Divisor visual
+- [x] `components/timer/TimerDisplay.tsx`: Display grande del temporizador con estados
+- [x] `components/timer/TimerConfig.tsx`: Configuracion de rondas/duracion/descanso
+- [x] `components/timer/SessionSaveSheet.tsx`: Pantalla de guardado post-entrenamiento
+- [x] `components/training/SessionCard.tsx`: Tarjeta de sesion de entrenamiento
+- [x] `components/training/ExerciseItem.tsx`: Item de ejercicio con contador
+- [x] `components/onboarding/StepIndicator.tsx`: Indicador de progreso del cuestionario
+- [x] `components/onboarding/QuestionOption.tsx`: Opcion seleccionable del cuestionario
+- [x] `components/onboarding/InjuriesStep.tsx`: Paso de lesiones/limitaciones
+- [x] Refactorizar todas las pantallas para usar el sistema de componentes
+- [x] Mejorar diseno visual: headers con iconos, cards con acentos, espaciado consistente
+- [x] Tipografia numerica monoespaciada en temporizador
+- [x] Labels de formularios, iconos de visibilidad de contrasena
+- [x] KeyboardAvoidingView en pantallas de auth
+
+---
+
+## Pendiente (requiere accion manual)
+- [ ] **Variables de entorno**: Crear archivo `.env` con `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_OLLAMA_BASE_URL`
+- [ ] **Ejecutar SQL en Supabase**: Crear las tablas `user_profile`, `sessions`, `training_plans` y las políticas RLS
+- [ ] **Probar con Ollama**: Tener Ollama corriendo localmente con `llama3.2` para generar planes
+- [ ] **Probar en dispositivo**: Ejecutar `npx expo start` y probar en Expo Go
+- [ ] **Confirmacion de email**: En Supabase, los usuarios nuevos deben confirmar su email. Se puede desactivar en Authentication > Settings > Disable email confirmation para desarrollo.
+
+---
+
+## Resumen de cambios (sesion inicial)
+
+Se construyó la aplicación completa desde cero. Archivos creados:
+
+**Configuración:** `metro.config.js`, `global.css`, `nativewind-env.d.ts`, `app.json` (actualizado), `tsconfig.json` (actualizado), `package.json` (actualizado)
+
+**Tipos y constantes:** `types/index.ts`, `constants/index.ts`
+
+**Librerías:** `lib/utils.ts`, `lib/supabase.ts`, `lib/agent.ts`
+
+**Stores:** `stores/userStore.ts`, `stores/timerStore.ts`, `stores/trainingStore.ts`
+
+**Componentes UI:** `Button`, `Card`, `Badge`, `ScreenHeader`, `ProgressBar` (+ StepDots), `EmptyState`, `Divider`
+
+**Componentes temporizador:** `TimerDisplay`, `TimerConfig`, `SessionSaveSheet`
+
+**Componentes entrenamiento:** `SessionCard`, `ExerciseItem`
+
+**Componentes onboarding:** `StepIndicator`, `QuestionOption`, `InjuriesStep`
+
+**Pantallas y layouts (Expo Router):**
+- Root: `app/_layout.tsx`, `app/index.tsx`
+- Auth: `app/(auth)/_layout.tsx`, `login.tsx`, `register.tsx`
+- Onboarding: `app/(onboarding)/_layout.tsx`, `welcome.tsx`, `questionnaire.tsx`
+- Tabs: `app/(tabs)/_layout.tsx`, `home.tsx`, `timer.tsx`, `training.tsx`, `history.tsx`, `profile.tsx`
+- Training: `app/training/[sessionId].tsx`
+
+**Eliminados:** `App.tsx`, `index.ts` (plantillas legacy)
+
+---
+
+*Ultima actualizacion: Junio 2026*
+*Proyecto: Kensei — App de artes marciales*
