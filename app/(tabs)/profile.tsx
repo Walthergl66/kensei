@@ -1,5 +1,6 @@
 import { View, Text, ScrollView, Alert, SafeAreaView } from 'react-native';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useUserStore } from '@/stores/userStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { getInitials } from '@/lib/utils';
@@ -28,12 +29,12 @@ const levelLabels: Record<string, string> = {
 
 export default function ProfileScreen() {
   const { profile, isDevMode, signOut, setProfile, setIsOnboarded } = useUserStore();
-  const { plan, setPlan } = useTrainingStore();
+  const { plan, clearPlan } = useTrainingStore();
 
   function handleRestartOnboarding() {
     Alert.alert(
       'Reiniciar onboarding',
-      '¿Estás seguro? Esto borrará tus datos actuales.',
+      'Estas seguro? Esto borrara tus datos actuales.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -42,7 +43,7 @@ export default function ProfileScreen() {
           onPress: () => {
             setProfile(null);
             setIsOnboarded(false);
-            setPlan(null);
+            clearPlan();
             router.replace('/(onboarding)/welcome');
           },
         },
@@ -54,7 +55,7 @@ export default function ProfileScreen() {
     if (isDevMode) {
       setProfile(null);
       setIsOnboarded(false);
-      setPlan(null);
+      clearPlan();
       router.replace('/(onboarding)/welcome');
       return;
     }
@@ -64,49 +65,57 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#0A0A0A]">
-      <ScrollView className="flex-1 px-4">
-        <View className="items-center py-8">
-          <View className="w-20 h-20 rounded-full bg-[#E8C547] items-center justify-center mb-4">
-            <Text className="text-[#0A0A0A] text-2xl font-bold">
+      <ScrollView className="flex-1 px-4" showsVerticalScrollIndicator={false}>
+        <View className="items-center pt-8 pb-6">
+          <View className="w-20 h-20 rounded-full bg-[#E8C547] items-center justify-center mb-4 border-2 border-[#E8C547]/30">
+            <Text className="text-[#0A0A0A] text-3xl font-bold">
               {profile?.name ? getInitials(profile.name) : 'K'}
             </Text>
           </View>
-          <Text className="text-[#F5F5F5] text-xl font-bold">{profile?.name || 'Guerrero'}</Text>
+          <Text className="text-[#F5F5F5] text-2xl font-bold tracking-tight">{profile?.name || 'Guerrero'}</Text>
           {profile?.discipline && (
-            <Text className="text-[#888888] text-sm">{disciplineLabels[profile.discipline] || profile.discipline}</Text>
+            <Text className="text-[#666666] text-sm mt-1">{disciplineLabels[profile.discipline] || profile.discipline}</Text>
           )}
         </View>
 
         {profile && (
-          <Card className="mb-4">
-            <View className="gap-3">
-              <View className="flex-row items-center gap-3">
-                <Text className="text-lg">🎯</Text>
+          <Card>
+            <View className="gap-4">
+              <View className="flex-row items-center gap-4">
+                <View className="w-10 h-10 rounded-xl bg-[#E8C547]/10 items-center justify-center">
+                  <Ionicons name="flag" size={18} color="#E8C547" />
+                </View>
                 <View>
-                  <Text className="text-[#888888] text-xs">Objetivo</Text>
-                  <Text className="text-[#F5F5F5] text-sm">{goalLabels[profile.goal] || profile.goal}</Text>
+                  <Text className="text-[#666666] text-xs uppercase tracking-wider">Objetivo</Text>
+                  <Text className="text-[#F5F5F5] text-sm font-medium mt-0.5">{goalLabels[profile.goal] || profile.goal}</Text>
                 </View>
               </View>
-              <View className="flex-row items-center gap-3">
-                <Text className="text-lg">📈</Text>
+              <View className="flex-row items-center gap-4">
+                <View className="w-10 h-10 rounded-xl bg-[#E8C547]/10 items-center justify-center">
+                  <Ionicons name="trending-up" size={18} color="#E8C547" />
+                </View>
                 <View>
-                  <Text className="text-[#888888] text-xs">Nivel</Text>
-                  <Text className="text-[#F5F5F5] text-sm">{levelLabels[profile.level] || profile.level}</Text>
+                  <Text className="text-[#666666] text-xs uppercase tracking-wider">Nivel</Text>
+                  <Text className="text-[#F5F5F5] text-sm font-medium mt-0.5">{levelLabels[profile.level] || profile.level}</Text>
                 </View>
               </View>
-              <View className="flex-row items-center gap-3">
-                <Text className="text-lg">📅</Text>
+              <View className="flex-row items-center gap-4">
+                <View className="w-10 h-10 rounded-xl bg-[#E8C547]/10 items-center justify-center">
+                  <Ionicons name="calendar" size={18} color="#E8C547" />
+                </View>
                 <View>
-                  <Text className="text-[#888888] text-xs">Días por semana</Text>
-                  <Text className="text-[#F5F5F5] text-sm">{profile.days_per_week} días</Text>
+                  <Text className="text-[#666666] text-xs uppercase tracking-wider">Dias por semana</Text>
+                  <Text className="text-[#F5F5F5] text-sm font-medium mt-0.5">{profile.days_per_week} dias</Text>
                 </View>
               </View>
               {profile.injuries && (
-                <View className="flex-row items-center gap-3">
-                  <Text className="text-lg">⚠️</Text>
+                <View className="flex-row items-center gap-4">
+                  <View className="w-10 h-10 rounded-xl bg-[#FF9800]/10 items-center justify-center">
+                    <Ionicons name="alert-circle" size={18} color="#FF9800" />
+                  </View>
                   <View>
-                    <Text className="text-[#888888] text-xs">Lesiones</Text>
-                    <Text className="text-[#F5F5F5] text-sm">{profile.injuries}</Text>
+                    <Text className="text-[#666666] text-xs uppercase tracking-wider">Lesiones</Text>
+                    <Text className="text-[#F5F5F5] text-sm font-medium mt-0.5">{profile.injuries}</Text>
                   </View>
                 </View>
               )}
@@ -114,17 +123,33 @@ export default function ProfileScreen() {
           </Card>
         )}
 
-        {plan ? (
-          <Card className="mb-4">
-            <Text className="text-[#E8C547] font-bold mb-2">Plan activo</Text>
-            <Text className="text-[#F5F5F5]">{plan.plan_name}</Text>
-            <Text className="text-[#888888] text-xs">{plan.duration_weeks} semanas · {plan.sessions_per_week} sesiones/semana</Text>
-          </Card>
-        ) : (
-          <Card className="mb-4">
-            <Text className="text-[#888888] text-center py-2">Sin plan activo</Text>
-          </Card>
-        )}
+        <View className="mt-4">
+          {plan ? (
+            <Card>
+              <View className="flex-row items-center gap-4">
+                <View className="w-10 h-10 rounded-xl bg-[#4CAF50]/10 items-center justify-center">
+                  <Ionicons name="fitness" size={18} color="#4CAF50" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-[#4CAF50] text-xs uppercase tracking-wider font-semibold">Plan activo</Text>
+                  <Text className="text-[#F5F5F5] font-semibold mt-0.5">{plan.plan_name}</Text>
+                  <Text className="text-[#666666] text-xs mt-0.5">{plan.duration_weeks} semanas · {plan.sessions_per_week} sesiones/semana</Text>
+                </View>
+              </View>
+            </Card>
+          ) : (
+            <Card>
+              <View className="flex-row items-center gap-4">
+                <View className="w-10 h-10 rounded-xl bg-[#1A1A1A] items-center justify-center">
+                  <Ionicons name="fitness-outline" size={18} color="#666666" />
+                </View>
+                <View>
+                  <Text className="text-[#666666] text-xs uppercase tracking-wider">Sin plan activo</Text>
+                </View>
+              </View>
+            </Card>
+          )}
+        </View>
 
         <Divider />
 
@@ -135,7 +160,7 @@ export default function ProfileScreen() {
             variant="outline"
           />
           <Button
-            title={isDevMode ? 'Salir del modo desarrollo' : 'Cerrar sesión'}
+            title={isDevMode ? 'Salir del modo desarrollo' : 'Cerrar sesion'}
             onPress={handleSignOut}
             variant="danger"
           />

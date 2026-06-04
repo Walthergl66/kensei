@@ -33,3 +33,12 @@ export function getIntensityLabel(intensity: 'low' | 'medium' | 'high'): string 
     case 'high': return 'Alta';
   }
 }
+
+export function validateEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+export function getDisciplineIcon(discipline: string): string {
+  const icons: Record<string, string> = { boxing: 'boxing', mma: 'mma', both: 'boxing' };
+  return icons[discipline] || 'boxing';
+}

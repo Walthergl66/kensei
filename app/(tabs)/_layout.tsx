@@ -1,5 +1,15 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+type IoniconName = keyof typeof Ionicons.glyphMap;
+
+const tabIcons: Record<string, { focused: IoniconName; unfocused: IoniconName }> = {
+  home: { focused: 'home', unfocused: 'home-outline' },
+  timer: { focused: 'timer', unfocused: 'timer-outline' },
+  training: { focused: 'fitness', unfocused: 'fitness-outline' },
+  history: { focused: 'bar-chart', unfocused: 'bar-chart-outline' },
+  profile: { focused: 'person', unfocused: 'person-outline' },
+};
 
 export default function TabsLayout() {
   return (
@@ -23,35 +33,45 @@ export default function TabsLayout() {
         name="home"
         options={{
           title: 'Inicio',
-          tabBarIcon: ({ color, size }) => <Text style={{ color, fontSize: size }}>🏠</Text>,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? tabIcons.home.focused : tabIcons.home.unfocused} size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="timer"
         options={{
           title: 'Timer',
-          tabBarIcon: ({ color, size }) => <Text style={{ color, fontSize: size }}>⏱️</Text>,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? tabIcons.timer.focused : tabIcons.timer.unfocused} size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="training"
         options={{
           title: 'Plan',
-          tabBarIcon: ({ color, size }) => <Text style={{ color, fontSize: size }}>📋</Text>,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? tabIcons.training.focused : tabIcons.training.unfocused} size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
           title: 'Historial',
-          tabBarIcon: ({ color, size }) => <Text style={{ color, fontSize: size }}>📊</Text>,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? tabIcons.history.focused : tabIcons.history.unfocused} size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Perfil',
-          tabBarIcon: ({ color, size }) => <Text style={{ color, fontSize: size }}>👤</Text>,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? tabIcons.profile.focused : tabIcons.profile.unfocused} size={size} color={color} />
+          ),
         }}
       />
     </Tabs>

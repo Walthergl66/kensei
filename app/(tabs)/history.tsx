@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { View, Text, ScrollView, RefreshControl, SafeAreaView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { getSessions } from '@/lib/supabase';
 import { useUserStore } from '@/stores/userStore';
@@ -7,37 +8,64 @@ import { Session } from '@/types';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
 
-const disciplineIcons: Record<string, string> = {
-  boxing: '🥊',
-  mma: '🦵',
-  both: '🥊',
+const disciplineIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
+  boxing: 'bonfire',
+  mma: 'fitness',
+  both: 'bonfire',
+};
+
+const disciplineColors: Record<string, string> = {
+  boxing: '#E8C547',
+  mma: '#F44336',
+  both: '#E8C547',
 };
 
 export default function HistoryScreen() {
   const { session, isDevMode } = useUserStore();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingError, setLoadingError] = useState(false);
 
   async function loadSessions() {
     if (isDevMode || !session?.user?.id) {
       setSessions([]);
+      setLoadingError(false);
       return;
     }
-    const data = await getSessions(session.user.id);
-    setSessions(data);
+    try {
+      const data = await getSessions(session.user.id);
+      setSessions(data);
+      setLoadingError(false);
+    } catch {
+      setLoadingError(true);
+    }
   }
 
   useFocusEffect(
     useCallback(() => {
       loadSessions();
-    }, [session])
+    }, [session?.user?.id, isDevMode])
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadSessions();
     setRefreshing(false);
-  }, [session]);
+  }, [session?.user?.id, isDevMode]);
+
+  if (loadingError) {
+    return (
+      <SafeAreaView className="flex-1 bg-[#0A0A0A]">
+        <EmptyState
+          icon="⚠️"
+          title="Error al cargar"
+          subtitle="No se pudieron cargar tus entrenamientos. Tira hacia abajo para reintentar."
+          actionLabel="Reintentar"
+          onAction={onRefresh}
+        />
+      </SafeAreaView>
+    );
+  }
 
   if (sessions.length === 0) {
     return (
@@ -45,7 +73,7 @@ export default function HistoryScreen() {
         <EmptyState
           icon="📊"
           title="Sin entrenamientos"
-          subtitle="Tus sesiones guardadas aparecerán aquí"
+          subtitle="Tus sesiones guardadas apareceran aqui"
         />
       </SafeAreaView>
     );
@@ -56,27 +84,49 @@ export default function HistoryScreen() {
       <ScrollView
         className="flex-1 px-4"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E8C547" />}
+        showsVerticalScrollIndicator={false}
       >
-        <View className="py-4">
-          <Text className="text-[#F5F5F5] text-2xl font-bold">Historial</Text>
-          <Text className="text-[#888888] text-sm mt-1">{sessions.length} entrenamientos</Text>
+        <View className="pt-8 pb-4">
+          <Text className="text-[#F5F5F5] text-2xl font-bold tracking-tight">Historial</Text>
+          <Text className="text-[#666666] text-sm mt-1">{sessions.length} entrenamientos</Text>
         </View>
 
         {sessions.map((s) => (
           <Card key={s.id} className="mb-3">
             <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center gap-3">
-                <Text className="text-2xl">{disciplineIcons[s.discipline] || '🥊'}</Text>
+              <View className="flex-row items-center gap-4">
+                <View className="w-10 h-10 rounded-xl bg-[#1A1A1A] items-center justify-center">
+                  <Ionicons
+                    name={disciplineIcons[s.discipline] || 'bonfire'}
+                    size={18}
+                    color={disciplineColors[s.discipline] || '#E8C547'}
+                  />
+                </View>
                 <View>
-                  <Text className="text-[#F5F5F5] font-semibold">{s.date}</Text>
-                  <Text className="text-[#888888] text-xs">{s.duration_minutes} min{s.rounds_completed ? ` · ${s.rounds_completed} rondas` : ''}</Text>
+                  <Text className="text-[#F5F5F5] font-semibold text-sm">{s.date}</Text>
+                  <Text className="text-[#666666] text-xs mt-0.5">
+                    {s.duration_minutes} min{s.rounds_completed ? ` · ${s.rounds_completed} rondas` : ''}
+                  </Text>
                 </View>
               </View>
               {s.rating && (
-                <Text className="text-[#E8C547] text-lg">{'★'.repeat(s.rating)}{'☆'.repeat(5 - s.rating)}</Text>
+                <View className="flex-row">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Ionicons
+                      key={star}
+                      name={star <= s.rating! ? 'star' : 'star-outline'}
+                      size={14}
+                      color={star <= s.rating! ? '#E8C547' : '#333333'}
+                    />
+                  ))}
+                </View>
               )}
             </View>
-            {s.notes && <Text className="text-[#888888] text-xs mt-2">{s.notes}</Text>}
+            {s.notes && (
+              <View className="mt-3 pt-3 border-t border-[#1E1E1E]">
+                <Text className="text-[#666666] text-xs leading-5">{s.notes}</Text>
+              </View>
+            )}
           </Card>
         ))}
         <View className="h-8" />

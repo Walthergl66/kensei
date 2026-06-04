@@ -689,5 +689,46 @@ Se construyó la aplicación completa desde cero. Archivos creados:
 
 ---
 
+---
+
+### 21. Auditoría y corrección de bugs (Junio 2026)
+- [x] **BUG CRÍTICO**: `home.tsx` navegación siempre a sesión 0 — `indexOf` con objeto diferente al buscado. Reemplazado por `findIndex` que retorna índice correcto.
+- [x] **BUG CRÍTICO**: `app/_layout.tsx` infinite loading — `loadUserData()` sin try/catch. Si `getUserProfile()` lanzaba error, `isLoading` nunca pasaba a `false`.
+- [x] **BUG**: `lib/supabase.ts` errores silenciosos — todas las funciones ahora capturan y lanzan `error.message` de Supabase.
+- [x] **BUG**: `history.tsx` dependencias faltantes — `useFocusEffect` y `onRefresh` ahora dependen de `session?.user?.id` y `isDevMode`.
+- [x] **BUG**: `timer.tsx` faltaba import de `Alert` para manejo de error en guardado.
+- [x] **UX**: `SessionSaveSheet` guardaba con `setSaved(true)` inmediato sin esperar respuesta. Ahora espera el `await onSave()`.
+- [x] **UX**: `timer.tsx` no mostraba feedback en modo dev. `handleSave` ahora retorna `true` inmediatamente en dev mode.
+- [x] **UX**: Tabs migrados de emoji a Ionicons (`home`, `timer`, `fitness`, `bar-chart`, `person`).
+- [x] **UX**: `TimerConfig` botones +/- migrados a Ionicons (`remove`, `add`).
+- [x] **UX**: Duración del timer ahora usa incrementos de 1 minuto (antes 30s) para evitar decimales.
+- [x] **UX**: `home.tsx` eliminado emoji condicional del saludo.
+- [x] **UX**: `questionnaire.tsx` eliminado código redundante en `handleAnswer`/`handleNext`.
+- [x] **UX**: Tipado fuerte — eliminados `any` en `home.tsx` (getTodaySession) y `questionnaire.tsx` (options map).
+- [x] **UX**: `TimerConfig` botones +/- ahora con Ionicons en lugar de texto plano.
+- [x] **UX**: `_layout.tsx` cleanup de interval al pausar app (AppState).
+- [x] **UX**: `history.tsx` estado de error con opción de reintentar.
+
+### 22. Refactor estético y funcional completo (Junio 2026)
+- [x] **FUNCIONAL**: Timer reanuda correctamente al volver de background — store guarda timestamp `pausedAt` y `resumeTimer()` recalcula tiempo transcurrido.
+- [x] **FUNCIONAL**: Home pull-to-refresh carga plan desde Supabase realmente.
+- [x] **FUNCIONAL**: Questionnaire navegación hacia atrás con botón back + Ionicons.
+- [x] **FUNCIONAL**: Session detail botón de volver con `router.back()`.
+- [x] **FUNCIONAL**: Auth formularios con validación (email, password length).
+- [x] **ESTÉTICO**: Splash animado con logo flame + ActivityIndicator.
+- [x] **ESTÉTICO**: Tarjetas con `shadowColor`/`elevation` para profundidad.
+- [x] **ESTÉTICO**: Bordes redondeados `rounded-2xl` consistentes en toda la app.
+- [x] **ESTÉTICO**: Iconos Ionicons en toda la app (profile, history, welcome, session detail, etc.).
+- [x] **ESTÉTICO**: Tipografía con `tracking-tight`, `tracking-wide` para legibilidad.
+- [x] **ESTÉTICO**: Estados empty/error con background icon container.
+- [x] **ESTÉTICO**: TimerDisplay rediseñado con background tint, barra de progreso, espaciado.
+- [x] **ESTÉTICO**: Login/Register con icono flame, labels uppercase.
+- [x] **ESTÉTICO**: Colores consistentes (#1E1E1E borders, #666666 muted text, #555555 placeholders).
+- [x] **ESTÉTICO**: Barra de progreso horizontal en el StepIndicator (antes dots).
+- [x] **ESTÉTICO**: Transition `fade` entre pantallas en root Stack.
+- [x] **ESTÉTICO**: Todos los ScrollView con `showsVerticalScrollIndicator={false}`.
+
+---
+
 *Ultima actualizacion: Junio 2026*
 *Proyecto: Kensei — App de artes marciales*

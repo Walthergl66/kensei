@@ -14,38 +14,57 @@ export default function TimerDisplay({ timeLeft, status, currentRound, totalRoun
   const secs = timeLeft % 60;
   const timeString = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 
-  const statusColors: Record<TimerStatus, string> = {
-    idle: '#888888',
-    running: '#F5F5F5',
-    resting: '#2196F3',
-    warning: '#FF9800',
-    finished: '#4CAF50',
+  const theme: Record<TimerStatus, { color: string; label: string; bg: string }> = {
+    idle: { color: '#666666', label: 'Listo', bg: '#1A1A1A' },
+    running: { color: '#F5F5F5', label: 'Ronda', bg: '#141414' },
+    resting: { color: '#2196F3', label: 'Descanso', bg: '#0D1B2A' },
+    warning: { color: '#FF9800', label: 'Aviso', bg: '#1A0F00' },
+    finished: { color: '#4CAF50', label: 'Completado', bg: '#0A1A0A' },
   };
 
-  const statusLabels: Record<TimerStatus, string> = {
-    idle: 'Listo',
-    running: 'Ronda',
-    resting: 'Descanso',
-    warning: '¡Aviso!',
-    finished: 'Completado',
-  };
+  const t = theme[status];
+  const progress = status === 'idle' || status === 'finished' ? 0 : currentRound / totalRounds;
 
   return (
-    <View className="items-center justify-center py-8">
+    <View className="items-center justify-center py-12 px-4">
       {sessionName && (
-        <View className="bg-[#E8C547]/20 px-4 py-1 rounded-full mb-4">
-          <Text className="text-[#E8C547] text-sm font-medium">{sessionName}</Text>
+        <View className="bg-[#E8C547]/10 px-4 py-1.5 rounded-full mb-6 border border-[#E8C547]/20">
+          <Text className="text-[#E8C547] text-sm font-medium tracking-wide">{sessionName}</Text>
         </View>
       )}
-      <Text className="text-7xl font-bold mb-2" style={{ fontFamily: 'monospace', color: statusColors[status] }}>
-        {timeString}
-      </Text>
-      <Text className="text-lg font-semibold mb-1" style={{ color: statusColors[status] }}>
-        {statusLabels[status]}
-      </Text>
-      <Text className="text-[#888888] text-sm">
-        Ronda {currentRound} de {totalRounds}
-      </Text>
+
+      <View className={`w-full rounded-3xl p-8 mb-4 border ${status === 'idle' ? 'border-[#1E1E1E]' : 'border-transparent'}`} style={{ backgroundColor: t.bg }}>
+        <Text
+          className="text-8xl font-bold text-center tracking-widest"
+          style={{ color: t.color, fontFamily: 'monospace', lineHeight: 120 }}
+        >
+          {timeString}
+        </Text>
+      </View>
+
+      <View className="items-center gap-2">
+        <View className="flex-row items-center gap-2">
+          <View className="w-2 h-2 rounded-full" style={{ backgroundColor: t.color }} />
+          <Text className="text-lg font-semibold tracking-wide" style={{ color: t.color }}>
+            {t.label}
+          </Text>
+        </View>
+        <Text className="text-[#666666] text-sm font-medium">
+          Ronda {currentRound} de {totalRounds}
+        </Text>
+      </View>
+
+      {status !== 'idle' && status !== 'finished' && (
+        <View className="w-full bg-[#1A1A1A] rounded-full h-1 mt-8 overflow-hidden">
+          <View
+            className="h-full rounded-full"
+            style={{
+              width: `${progress * 100}%`,
+              backgroundColor: t.color,
+            }}
+          />
+        </View>
+      )}
     </View>
   );
 }

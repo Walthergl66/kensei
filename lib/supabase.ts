@@ -20,11 +20,12 @@ export const supabase = isConfigured
 
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   if (!supabase) return null;
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('user_profile')
     .select('*')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
+  if (error) throw new Error(error.message);
   return data;
 }
 
@@ -33,10 +34,11 @@ export async function saveUserProfile(
   profile: Omit<UserProfile, 'id' | 'user_id' | 'created_at'>
 ): Promise<void> {
   if (!supabase) return;
-  await supabase.from('user_profile').upsert({
+  const { error } = await supabase.from('user_profile').upsert({
     user_id: userId,
     ...profile,
   });
+  if (error) throw new Error(error.message);
 }
 
 export async function saveSession(
@@ -44,10 +46,11 @@ export async function saveSession(
   session: NewSession
 ): Promise<void> {
   if (!supabase) return;
-  await supabase.from('sessions').insert({
+  const { error } = await supabase.from('sessions').insert({
     user_id: userId,
     ...session,
   });
+  if (error) throw new Error(error.message);
 }
 
 export async function getSessions(
@@ -55,12 +58,13 @@ export async function getSessions(
   limit = 50
 ): Promise<Session[]> {
   if (!supabase) return [];
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('sessions')
     .select('*')
     .eq('user_id', userId)
     .order('date', { ascending: false })
     .limit(limit);
+  if (error) throw new Error(error.message);
   return data ?? [];
 }
 
@@ -69,30 +73,33 @@ export async function saveTrainingPlan(
   plan: TrainingPlan
 ): Promise<void> {
   if (!supabase) return;
-  await supabase.from('training_plans').insert({
+  const { error } = await supabase.from('training_plans').insert({
     user_id: userId,
     plan_json: JSON.parse(JSON.stringify(plan)),
     active: true,
   });
+  if (error) throw new Error(error.message);
 }
 
 export async function deactivateOtherPlans(userId: string): Promise<void> {
   if (!supabase) return;
-  await supabase
+  const { error } = await supabase
     .from('training_plans')
     .update({ active: false })
     .eq('user_id', userId);
+  if (error) throw new Error(error.message);
 }
 
 export async function getActiveTrainingPlan(
   userId: string
 ): Promise<TrainingPlan | null> {
   if (!supabase) return null;
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('training_plans')
     .select('plan_json')
     .eq('user_id', userId)
     .eq('active', true)
     .maybeSingle();
+  if (error) throw new Error(error.message);
   return data?.plan_json as TrainingPlan | null;
 }

@@ -15,7 +15,7 @@ interface ButtonProps {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary: 'bg-[#E8C547]',
-  secondary: 'bg-[#141414] border border-[#2A2A2A]',
+  secondary: 'bg-[#1A1A1A] border border-[#333333]',
   outline: 'border border-[#E8C547]',
   danger: 'bg-[#F44336]',
   ghost: '',
@@ -32,7 +32,7 @@ const textStyles: Record<ButtonVariant, string> = {
   secondary: 'text-[#F5F5F5] font-bold',
   outline: 'text-[#E8C547] font-bold',
   danger: 'text-[#F5F5F5] font-bold',
-  ghost: 'text-[#E8C547]',
+  ghost: 'text-[#888888]',
 };
 
 export default function Button({
@@ -48,11 +48,19 @@ export default function Button({
     <TouchableOpacity
       onPress={onPress}
       disabled={disabled || loading}
-      className={`rounded-xl items-center justify-center flex-row ${variantStyles[variant]} ${sizeStyles[size]} ${disabled ? 'opacity-50' : ''} ${className}`}
-      activeOpacity={0.7}
+      className={`rounded-xl items-center justify-center flex-row ${variantStyles[variant]} ${sizeStyles[size]} ${disabled ? 'opacity-40' : ''} ${className}`}
+      activeOpacity={0.8}
     >
-      {loading && <ActivityIndicator size="small" color={variant === 'primary' ? '#0A0A0A' : '#E8C547'} className="mr-2" />}
-      <Text className={`text-center ${textStyles[variant]} ${size === 'sm' ? 'text-sm' : size === 'lg' ? 'text-lg' : 'text-base'}`}>
+      {loading && (
+        <ActivityIndicator
+          size="small"
+          color={variant === 'primary' ? '#0A0A0A' : variant === 'outline' ? '#E8C547' : '#F5F5F5'}
+          className="mr-2"
+        />
+      )}
+      <Text
+        className={`text-center ${textStyles[variant]} ${size === 'sm' ? 'text-sm' : size === 'lg' ? 'text-base' : 'text-sm'} tracking-wide`}
+      >
         {title}
       </Text>
     </TouchableOpacity>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Alert, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, TextInput, Alert, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useUserStore } from '@/stores/userStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { supabase, saveUserProfile, saveTrainingPlan, deactivateOtherPlans } from '@/lib/supabase';
@@ -13,42 +14,42 @@ import QuestionOption from '@/components/onboarding/QuestionOption';
 import InjuriesStep from '@/components/onboarding/InjuriesStep';
 
 const STEPS = [
-  { question: '¿Cómo te llamas?', type: 'text' as const, key: 'name' as const },
-  { question: '¿Qué disciplina quieres entrenar?', type: 'choice' as const, key: 'discipline' as const,
+  { question: 'Como te llamas?', type: 'text' as const, key: 'name' as const },
+  { question: 'Que disciplina quieres entrenar?', type: 'choice' as const, key: 'discipline' as const,
     options: [
       { label: 'Boxeo', value: 'boxing' as Discipline },
       { label: 'MMA', value: 'mma' as Discipline },
       { label: 'Ambas', value: 'both' as Discipline },
     ]},
-  { question: '¿Cuál es tu objetivo principal?', type: 'choice' as const, key: 'goal' as const,
+  { question: 'Cual es tu objetivo principal?', type: 'choice' as const, key: 'goal' as const,
     options: [
       { label: 'Competir', value: 'compete' as Goal },
       { label: 'Ponerme en forma', value: 'fitness' as Goal },
       { label: 'Defensa personal', value: 'selfdefense' as Goal },
       { label: 'Aprender desde cero', value: 'beginner' as Goal },
     ]},
-  { question: '¿Cuál es tu nivel actual?', type: 'choice' as const, key: 'level' as const,
+  { question: 'Cual es tu nivel actual?', type: 'choice' as const, key: 'level' as const,
     options: [
       { label: 'Principiante', description: 'Nunca he entrenado', value: 'beginner' as Level },
       { label: 'Intermedio', description: 'Entreno ocasionalmente', value: 'intermediate' as Level },
       { label: 'Avanzado', description: 'Entreno regularmente', value: 'advanced' as Level },
     ]},
-  { question: '¿Cuántos días por semana puedes entrenar?', type: 'choice' as const, key: 'days_per_week' as const,
+  { question: 'Cuantos dias por semana puedes entrenar?', type: 'choice' as const, key: 'days_per_week' as const,
     options: [
-      { label: '2 días', value: 2 },
-      { label: '3 días', value: 3 },
-      { label: '4-5 días', value: 5 },
-      { label: 'Todos los días', value: 7 },
+      { label: '2 dias', value: 2 },
+      { label: '3 dias', value: 3 },
+      { label: '4-5 dias', value: 5 },
+      { label: 'Todos los dias', value: 7 },
     ]},
-  { question: '¿Qué equipamiento tienes disponible?', type: 'choice' as const, key: 'equipment' as const,
+  { question: 'Que equipamiento tienes disponible?', type: 'choice' as const, key: 'equipment' as const,
     options: [
       { label: 'Sin equipamiento', value: 'none' as Equipment },
       { label: 'Guantes y costal', value: 'basic' as Equipment },
       { label: 'Gimnasio completo', value: 'full' as Equipment },
     ]},
-  { question: '¿Cómo describes tu condición física actual?', type: 'choice' as const, key: 'fitness_level' as const,
+  { question: 'Como describes tu condicion fisica actual?', type: 'choice' as const, key: 'fitness_level' as const,
     options: [
-      { label: 'Baja', description: 'Me canso rápido', value: 'low' as FitnessLevel },
+      { label: 'Baja', description: 'Me canso rapido', value: 'low' as FitnessLevel },
       { label: 'Media', value: 'medium' as FitnessLevel },
       { label: 'Alta', description: 'Buena base cardio', value: 'high' as FitnessLevel },
     ]},
@@ -66,21 +67,19 @@ export default function QuestionnaireScreen() {
   const isLastQuestion = step === STEPS.length - 1;
   const totalSteps = STEPS.length + 1;
 
-  function handleAnswer(value: any) {
+  function handleAnswer(value: string | number) {
     setAnswers(prev => ({ ...prev, [currentStep.key]: value }));
-    if (!isLastQuestion) {
-      setStep(step + 1);
-    } else {
-      setStep(step + 1);
-    }
+    if (step < STEPS.length - 1) setStep(step + 1);
+    else setStep(step + 1);
   }
 
   function handleNext() {
-    if (isLastQuestion) {
-      setStep(step + 1);
-    } else {
-      setStep(step + 1);
-    }
+    if (step < STEPS.length - 1) setStep(step + 1);
+    else setStep(step + 1);
+  }
+
+  function handleBack() {
+    if (step > 0) setStep(step - 1);
   }
 
   async function handleSubmit() {
@@ -107,7 +106,7 @@ export default function QuestionnaireScreen() {
     }
 
     if (!session?.user?.id) {
-      Alert.alert('Error', 'Debes iniciar sesión primero');
+      Alert.alert('Error', 'Debes iniciar sesion primero');
       setLoading(false);
       return;
     }
@@ -130,7 +129,7 @@ export default function QuestionnaireScreen() {
       setIsOnboarded(true);
       router.replace('/(tabs)/home');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Ocurrió un error al guardar tu perfil');
+      Alert.alert('Error', error.message || 'Ocurrio un error al guardar tu perfil');
     } finally {
       setLoading(false);
     }
@@ -139,13 +138,18 @@ export default function QuestionnaireScreen() {
   if (step > STEPS.length - 1) {
     return (
       <View className="flex-1 bg-[#0A0A0A] px-6 pt-12">
-        <StepIndicator current={step} total={totalSteps} />
+        <View className="flex-row items-center mb-4">
+          <TouchableOpacity onPress={handleBack} className="mr-4">
+            <Ionicons name="chevron-back" size={24} color="#E8C547" />
+          </TouchableOpacity>
+          <StepIndicator current={step} total={totalSteps} />
+        </View>
         <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
           <InjuriesStep value={injuries} onChange={setInjuries} />
         </ScrollView>
-        <View className="pb-8">
+        <View className="pb-8 gap-2">
           <Button title="Finalizar" onPress={handleSubmit} loading={loading} disabled={loading} size="lg" />
-          <Button title="Omitir" onPress={handleSubmit} variant="ghost" className="mt-2" />
+          <Button title="Omitir" onPress={handleSubmit} variant="ghost" />
         </View>
       </View>
     );
@@ -153,23 +157,30 @@ export default function QuestionnaireScreen() {
 
   return (
     <View className="flex-1 bg-[#0A0A0A] px-6 pt-12">
-      <StepIndicator current={step} total={totalSteps} />
+      <View className="flex-row items-center mb-4">
+        {step > 0 && (
+          <TouchableOpacity onPress={handleBack} className="mr-4">
+            <Ionicons name="chevron-back" size={24} color="#E8C547" />
+          </TouchableOpacity>
+        )}
+        <StepIndicator current={step} total={totalSteps} />
+      </View>
       <View className="flex-1 justify-center">
-        <Text className="text-[#F5F5F5] text-xl font-bold mb-6">{currentStep.question}</Text>
+        <Text className="text-[#F5F5F5] text-2xl font-bold mb-8 tracking-tight">{currentStep.question}</Text>
 
         {currentStep.type === 'text' ? (
           <TextInput
-            className="bg-[#141414] text-[#F5F5F5] rounded-xl p-4 border border-[#2A2A2A] text-lg"
+            className="bg-[#141414] text-[#F5F5F5] rounded-2xl p-5 border border-[#1E1E1E] text-lg"
             placeholder="Tu nombre"
-            placeholderTextColor="#888888"
+            placeholderTextColor="#666666"
             value={answers.name || ''}
             onChangeText={(text) => setAnswers(prev => ({ ...prev, name: text }))}
             autoFocus
           />
         ) : (
-          currentStep.options?.map((opt: any) => (
+          currentStep.options?.map((opt: { label: string; description?: string; value: string | number }) => (
             <QuestionOption
-              key={opt.value}
+              key={String(opt.value)}
               label={opt.label}
               description={opt.description}
               selected={answers[currentStep.key] === opt.value}

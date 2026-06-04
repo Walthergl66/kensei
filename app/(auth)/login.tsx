@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useUserStore } from '@/stores/userStore';
+import { validateEmail } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 
 export default function LoginScreen() {
@@ -14,8 +16,12 @@ export default function LoginScreen() {
 
   async function handleLogin() {
     if (!supabase) return;
+    if (!email.trim()) { Alert.alert('Error', 'Ingresa tu email'); return; }
+    if (!validateEmail(email.trim())) { Alert.alert('Error', 'Email invalido'); return; }
+    if (!password) { Alert.alert('Error', 'Ingresa tu contrasena'); return; }
+
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setLoading(false);
     if (error) Alert.alert('Error', error.message);
   }
@@ -30,26 +36,31 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1 bg-[#0A0A0A] justify-center px-6"
     >
-      <Text className="text-[#E8C547] text-4xl font-bold text-center mb-2">Kensei</Text>
-      <Text className="text-[#888888] text-center mb-8">Inicia sesión para continuar</Text>
+      <View className="items-center mb-10">
+        <View className="w-16 h-16 rounded-2xl bg-[#E8C547]/10 items-center justify-center mb-4">
+          <Ionicons name="flame" size={32} color="#E8C547" />
+        </View>
+        <Text className="text-[#E8C547] text-3xl font-bold tracking-tight">Kensei</Text>
+        <Text className="text-[#666666] text-sm mt-2">Inicia sesion para continuar</Text>
+      </View>
 
-      <Text className="text-[#F5F5F5] text-sm mb-2 ml-1">Email</Text>
+      <Text className="text-[#666666] text-xs font-semibold uppercase tracking-wider mb-2 ml-1">Email</Text>
       <TextInput
-        className="bg-[#141414] text-[#F5F5F5] rounded-xl p-4 mb-4 border border-[#2A2A2A]"
+        className="bg-[#141414] text-[#F5F5F5] rounded-2xl p-4 mb-4 border border-[#1E1E1E]"
         placeholder="tu@email.com"
-        placeholderTextColor="#888888"
+        placeholderTextColor="#555555"
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
       />
 
-      <Text className="text-[#F5F5F5] text-sm mb-2 ml-1">Contraseña</Text>
+      <Text className="text-[#666666] text-xs font-semibold uppercase tracking-wider mb-2 ml-1">Contrasena</Text>
       <View className="relative mb-6">
         <TextInput
-          className="bg-[#141414] text-[#F5F5F5] rounded-xl p-4 border border-[#2A2A2A] pr-12"
-          placeholder="••••••••"
-          placeholderTextColor="#888888"
+          className="bg-[#141414] text-[#F5F5F5] rounded-2xl p-4 border border-[#1E1E1E] pr-12"
+          placeholder="Ingresa tu contrasena"
+          placeholderTextColor="#555555"
           value={password}
           onChangeText={setPassword}
           secureTextEntry={!showPassword}
@@ -58,17 +69,19 @@ export default function LoginScreen() {
           onPress={() => setShowPassword(!showPassword)}
           className="absolute right-4 top-4"
         >
-          <Text className="text-[#888888]">{showPassword ? '🙈' : '👁️'}</Text>
+          <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#666666" />
         </TouchableOpacity>
       </View>
 
-      <Button title="Iniciar sesión" onPress={handleLogin} loading={loading} disabled={loading} />
-      <TouchableOpacity onPress={() => router.push('/(auth)/register')} className="mt-4 items-center">
-        <Text className="text-[#888888]">¿No tienes cuenta? <Text className="text-[#E8C547]">Regístrate</Text></Text>
+      <Button title="Iniciar sesion" onPress={handleLogin} loading={loading} disabled={loading} size="lg" />
+      <TouchableOpacity onPress={() => router.push('/(auth)/register')} className="mt-5 items-center">
+        <Text className="text-[#666666] text-sm">
+          No tienes cuenta? <Text className="text-[#E8C547] font-semibold">Registrate</Text>
+        </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={handleDevMode} className="mt-8 items-center">
-        <Text className="text-[#888888] text-sm">Modo desarrollo (sin conexión)</Text>
+      <TouchableOpacity onPress={handleDevMode} className="mt-8 items-center py-2">
+        <Text className="text-[#555555] text-xs">Modo desarrollo (sin conexion)</Text>
       </TouchableOpacity>
     </KeyboardAvoidingView>
   );

@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { TimerConfig as TimerConfigType } from '@/types';
 
 interface TimerConfigProps {
@@ -23,7 +24,7 @@ function ConfigRow({ label, value, onIncrease, onDecrease, disabled }: {
           disabled={disabled}
           className="w-8 h-8 rounded-full bg-[#2A2A2A] items-center justify-center"
         >
-          <Text className="text-[#F5F5F5] text-lg">-</Text>
+          <Ionicons name="remove" size={18} color="#F5F5F5" />
         </TouchableOpacity>
         <Text className="text-[#F5F5F5] text-lg font-bold w-12 text-center">{value}</Text>
         <TouchableOpacity
@@ -31,7 +32,7 @@ function ConfigRow({ label, value, onIncrease, onDecrease, disabled }: {
           disabled={disabled}
           className="w-8 h-8 rounded-full bg-[#2A2A2A] items-center justify-center"
         >
-          <Text className="text-[#F5F5F5] text-lg">+</Text>
+          <Ionicons name="add" size={18} color="#F5F5F5" />
         </TouchableOpacity>
       </View>
     </View>
@@ -51,8 +52,8 @@ export default function TimerConfig({ config, onChange, disabled }: TimerConfigP
       <ConfigRow
         label="Duración (min)"
         value={config.round_duration / 60}
-        onIncrease={() => onChange({ round_duration: Math.min(300, config.round_duration + 30) })}
-        onDecrease={() => onChange({ round_duration: Math.max(30, config.round_duration - 30) })}
+        onIncrease={() => onChange({ round_duration: Math.min(300, config.round_duration + 60) })}
+        onDecrease={() => onChange({ round_duration: Math.max(60, config.round_duration - 60) })}
         disabled={disabled}
       />
       <ConfigRow

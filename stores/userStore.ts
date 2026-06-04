@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserProfile } from '@/types';
 import { supabase } from '@/lib/supabase';
 import type { Session } from '@supabase/supabase-js';
@@ -9,29 +11,52 @@ interface UserState {
   isLoading: boolean;
   isOnboarded: boolean;
   isDevMode: boolean;
+  remindersEnabled: boolean;
+  reminderTime: { hour: number; minute: number };
   setProfile: (profile: UserProfile | null) => void;
   setSession: (session: Session | null) => void;
   setIsLoading: (loading: boolean) => void;
   setIsOnboarded: (onboarded: boolean) => void;
   setDevMode: (dev: boolean) => void;
+  setReminders: (enabled: boolean, time?: { hour: number; minute: number }) => void;
   signOut: () => Promise<void>;
 }
 
-export const useUserStore = create<UserState>((set) => ({
-  profile: null,
-  session: null,
-  isLoading: true,
-  isOnboarded: false,
-  isDevMode: true,
-  setProfile: (profile) => set({ profile }),
-  setSession: (session) => set({ session }),
-  setIsLoading: (isLoading) => set({ isLoading }),
-  setIsOnboarded: (isOnboarded) => set({ isOnboarded }),
-  setDevMode: (isDevMode) => set({ isDevMode }),
-  signOut: async () => {
-    if (supabase) {
-      await supabase.auth.signOut();
+export const useUserStore = create<UserState>()(
+  persist(
+    (set) => ({
+      profile: null,
+      session: null,
+      isLoading: true,
+      isOnboarded: false,
+      isDevMode: true,
+      remindersEnabled: false,
+      reminderTime: { hour: 9, minute: 0 },
+      setProfile: (profile) => set({ profile }),
+      setSession: (session) => set({ session }),
+      setIsLoading: (isLoading) => set({ isLoading }),
+      setIsOnboarded: (isOnboarded) => set({ isOnboarded }),
+      setDevMode: (isDevMode) => set({ isDevMode }),
+      setReminders: (remindersEnabled, reminderTime) => set((state) => ({ 
+        remindersEnabled, 
+        reminderTime: reminderTime || state.reminderTime 
+      })),
+      signOut: async () => {
+        if (supabase) {
+          await supabase.auth.signOut();
+        }
+        set({ profile: null, session: null, isOnboarded: false });
+      },
+    }),
+    {
+      name: 'kensei-user-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({ 
+        remindersEnabled: state.remindersEnabled, 
+        reminderTime: state.reminderTime,
+        isOnboarded: state.isOnboarded,
+        isDevMode: state.isDevMode
+      }),
     }
-    set({ profile: null, session: null, isOnboarded: false });
-  },
-}));
+  )
+);
