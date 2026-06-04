@@ -96,36 +96,30 @@ export default function QuestionnaireScreen() {
       injuries: injuries || null,
     };
 
-    if (isDevMode || !supabase) {
-      setProfile({ id: 'dev', user_id: 'dev', ...profileData, created_at: new Date().toISOString() } as UserProfile);
+    const fullProfile = { id: isDevMode ? 'dev' : '', user_id: isDevMode ? 'dev' : (session?.user?.id || 'guest'), ...profileData, created_at: new Date().toISOString() } as UserProfile;
+
+    let generatedPlan = DEFAULT_PLAN;
+    try {
+      generatedPlan = await generateTrainingPlan(fullProfile);
+    } catch (e) {
+      console.warn('Agent failed, using default plan:', e);
+    }
+
+    if (isDevMode || !supabase || !session?.user?.id) {
+      setProfile(fullProfile);
+      setPlan(generatedPlan);
       setIsOnboarded(true);
-      setPlan(DEFAULT_PLAN);
       setLoading(false);
       router.replace('/(tabs)/home');
       return;
     }
 
-    if (!session?.user?.id) {
-      Alert.alert('Error', 'Debes iniciar sesion primero');
-      setLoading(false);
-      return;
-    }
-
     try {
       await saveUserProfile(session.user.id, profileData);
-      setProfile({ id: '', user_id: session.user.id, ...profileData, created_at: new Date().toISOString() } as UserProfile);
-
-      let plan = DEFAULT_PLAN;
-      try {
-        const fullProfile = { id: '', user_id: session.user.id, ...profileData, created_at: new Date().toISOString() } as UserProfile;
-        plan = await generateTrainingPlan(fullProfile);
-      } catch {
-        plan = DEFAULT_PLAN;
-      }
-
+      setProfile(fullProfile);
       await deactivateOtherPlans(session.user.id);
-      await saveTrainingPlan(session.user.id, plan);
-      setPlan(plan);
+      await saveTrainingPlan(session.user.id, generatedPlan);
+      setPlan(generatedPlan);
       setIsOnboarded(true);
       router.replace('/(tabs)/home');
     } catch (error: any) {

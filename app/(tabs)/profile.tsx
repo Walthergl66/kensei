@@ -1,9 +1,10 @@
-import { View, Text, ScrollView, Alert, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, Alert, SafeAreaView, TouchableOpacity, Switch } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUserStore } from '@/stores/userStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { getInitials } from '@/lib/utils';
+import { registerForPushNotificationsAsync, scheduleDailyReminder, cancelAllReminders } from '@/lib/notifications';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Divider from '@/components/ui/Divider';
@@ -28,8 +29,31 @@ const levelLabels: Record<string, string> = {
 };
 
 export default function ProfileScreen() {
-  const { profile, isDevMode, signOut, setProfile, setIsOnboarded } = useUserStore();
+  const { profile, isDevMode, remindersEnabled, reminderTime, setReminders, signOut, setProfile, setIsOnboarded } = useUserStore();
   const { plan, clearPlan } = useTrainingStore();
+
+  async function toggleReminders(value: boolean) {
+    if (value) {
+      const granted = await registerForPushNotificationsAsync();
+      if (!granted) {
+        Alert.alert('Permiso denegado', 'No pudimos activar las notificaciones. Por favor, revísalo en los ajustes de tu teléfono.');
+        return;
+      }
+      await scheduleDailyReminder(reminderTime.hour, reminderTime.minute);
+      setReminders(true);
+    } else {
+      await cancelAllReminders();
+      setReminders(false);
+    }
+  }
+
+  async function changeReminderHour(hour: number) {
+    const newTime = { ...reminderTime, hour };
+    setReminders(remindersEnabled, newTime);
+    if (remindersEnabled) {
+      await scheduleDailyReminder(newTime.hour, newTime.minute);
+    }
+  }
 
   function handleRestartOnboarding() {
     Alert.alert(
@@ -122,6 +146,44 @@ export default function ProfileScreen() {
             </View>
           </Card>
         )}
+
+        <View className="mt-4">
+          <Text className="text-[#666666] text-xs font-semibold uppercase tracking-widest mb-3 ml-1">Recordatorios</Text>
+          <Card>
+            <View className="flex-row items-center justify-between mb-4">
+              <View className="flex-row items-center gap-3">
+                <View className="w-10 h-10 rounded-xl bg-[#E8C547]/10 items-center justify-center">
+                  <Ionicons name="notifications" size={18} color="#E8C547" />
+                </View>
+                <Text className="text-[#F5F5F5] font-medium">Recordatorio diario</Text>
+              </View>
+              <Switch
+                value={remindersEnabled}
+                onValueChange={toggleReminders}
+                trackColor={{ false: '#2A2A2A', true: '#E8C547' }}
+                thumbColor={remindersEnabled ? '#0A0A0A' : '#888888'}
+              />
+            </View>
+            
+            {remindersEnabled && (
+              <View>
+                <Divider />
+                <Text className="text-[#666666] text-xs font-semibold uppercase tracking-wider mb-3">Hora del aviso</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2">
+                  {[6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].map((h) => (
+                    <TouchableOpacity
+                      key={h}
+                      onPress={() => changeReminderHour(h)}
+                      className={`w-12 h-10 rounded-lg items-center justify-center border ${reminderTime.hour === h ? 'bg-[#E8C547] border-[#E8C547]' : 'bg-[#141414] border-[#1E1E1E]'}`}
+                    >
+                      <Text className={`font-bold ${reminderTime.hour === h ? 'text-[#0A0A0A]' : 'text-[#888888]'}`}>{h}:00</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </Card>
+        </View>
 
         <View className="mt-4">
           {plan ? (

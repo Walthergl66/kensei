@@ -29,7 +29,7 @@ export const useUserStore = create<UserState>()(
       session: null,
       isLoading: true,
       isOnboarded: false,
-      isDevMode: true,
+      isDevMode: false,
       remindersEnabled: false,
       reminderTime: { hour: 9, minute: 0 },
       setProfile: (profile) => set({ profile }),
