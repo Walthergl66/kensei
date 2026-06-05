@@ -7,16 +7,37 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useUserStore } from '@/stores/userStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { supabase, getUserProfile, getActiveTrainingPlan } from '@/lib/supabase';
+import { DEFAULT_PLAN } from '@/constants';
+import { UserProfile } from '@/types';
 import '../global.css';
 
+const DEFAULT_PROFILE: UserProfile = {
+  id: 'guest',
+  user_id: 'guest',
+  name: 'Guerrero Kensei',
+  discipline: 'both',
+  goal: 'fitness',
+  level: 'intermediate',
+  days_per_week: 3,
+  equipment: 'basic',
+  fitness_level: 'medium',
+  injuries: null,
+  created_at: new Date().toISOString(),
+};
+
 export default function RootLayout() {
-  const { session, isLoading, setSession, setIsLoading, setProfile, setIsOnboarded, setDevMode } = useUserStore();
+  const { session, isLoading, profile, setSession, setIsLoading, setProfile, setIsOnboarded, setDevMode } = useUserStore();
   const { setPlan } = useTrainingStore();
 
   useEffect(() => {
     if (!supabase) {
       setDevMode(true);
-      setIsOnboarded(false);
+      // Solo inicializar si no hay un perfil ya cargado
+      if (!profile) {
+        setProfile(DEFAULT_PROFILE);
+        setIsOnboarded(true);
+        setPlan(DEFAULT_PLAN);
+      }
       setIsLoading(false);
       return;
     }

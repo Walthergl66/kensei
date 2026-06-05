@@ -1,10 +1,12 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUserStore } from '@/stores/userStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { supabase, getActiveTrainingPlan } from '@/lib/supabase';
+import { getCoachAdvice } from '@/lib/agent';
 import { getDayNameInSpanish } from '@/lib/utils';
 import { TrainingPlan, PlanSession } from '@/types';
 import Button from '@/components/ui/Button';
@@ -23,11 +25,20 @@ export default function HomeScreen() {
   const { profile, session, isDevMode } = useUserStore();
   const { plan, setPlan } = useTrainingStore();
   const [refreshing, setRefreshing] = useState(false);
+  const [coachAdvice, setCoachAdvice] = useState('La disciplina es el puente entre las metas y los logros.');
 
   const todayData = getTodaySession(plan);
 
+  const loadAdvice = useCallback(async () => {
+    if (profile) {
+      const advice = await getCoachAdvice(profile);
+      setCoachAdvice(advice);
+    }
+  }, [profile]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    await loadAdvice();
     if (!isDevMode && supabase && session?.user?.id) {
       try {
         const freshPlan = await getActiveTrainingPlan(session.user.id);
@@ -35,7 +46,11 @@ export default function HomeScreen() {
       } catch {}
     }
     setRefreshing(false);
-  }, [session?.user?.id, isDevMode]);
+  }, [session?.user?.id, isDevMode, loadAdvice]);
+
+  useEffect(() => {
+    loadAdvice();
+  }, [loadAdvice]);
 
   return (
     <SafeAreaView className="flex-1 bg-[#0A0A0A]">
@@ -51,6 +66,18 @@ export default function HomeScreen() {
           <Text className="text-[#666666] text-sm mt-1.5 tracking-wide">
             {getDayNameInSpanish()} — Listo para entrenar
           </Text>
+        </View>
+
+        <View className="mb-6">
+          <Card accentColor="#E8C547" className="bg-[#1A1A1A]/50 border-[#E8C547]/20">
+            <View className="flex-row items-center gap-3 mb-2">
+              <View className="w-8 h-8 rounded-full bg-[#E8C547]/10 items-center justify-center">
+                <Ionicons name="chatbubble-ellipses" size={16} color="#E8C547" />
+              </View>
+              <Text className="text-[#E8C547] text-xs font-bold uppercase tracking-wider">Consejo de Kensei</Text>
+            </View>
+            <Text className="text-[#F5F5F5] text-sm italic leading-5">"{coachAdvice}"</Text>
+          </Card>
         </View>
 
         {todayData ? (

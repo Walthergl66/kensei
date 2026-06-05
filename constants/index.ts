@@ -19,8 +19,9 @@ export const DEFAULT_TIMER = {
   warning_seconds: 10,
 };
 
-export const OLLAMA_MODEL = 'llama3.2';
-export const OLLAMA_BASE_URL = process.env.EXPO_PUBLIC_OLLAMA_BASE_URL ?? 'http://localhost:11434';
+export const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
+export const GROQ_MODEL = 'llama-3.3-70b-versatile';
+export const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 import { TrainingPlan } from '@/types';
 

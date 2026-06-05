@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, SafeAreaView, AppState, AppStateStatus, Alert, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, AppState, AppStateStatus, Alert, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTimerStore } from '@/stores/timerStore';
 import TimerDisplay from '@/components/timer/TimerDisplay';
 import TimerConfigComponent from '@/components/timer/TimerConfig';
@@ -91,6 +92,8 @@ export default function TimerScreen() {
             currentRound={currentRound}
             totalRounds={config.rounds}
             sessionName={sessionSource}
+            roundDuration={config.round_duration}
+            restDuration={config.rest_duration}
           />
         </View>
 

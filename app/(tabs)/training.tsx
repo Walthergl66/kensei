@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Alert, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useTrainingStore } from '@/stores/trainingStore';
@@ -21,21 +22,17 @@ export default function TrainingScreen() {
     if (!profile) return;
     setRegenerating(true);
 
-    if (isDevMode || !supabase) {
-      setPlan(DEFAULT_PLAN);
-      setRegenerating(false);
-      return;
-    }
-
     try {
       const newPlan = await generateTrainingPlan(profile);
-      if (session?.user?.id) {
+      
+      if (!isDevMode && supabase && session?.user?.id) {
         await deactivateOtherPlans(session.user.id);
         await saveTrainingPlan(session.user.id, newPlan);
       }
+      
       setPlan(newPlan);
-    } catch {
-      Alert.alert('Error', 'No se pudo generar el plan. Usando plan por defecto.');
+    } catch (error: any) {
+      Alert.alert('Error del Agente', error.message || 'No se pudo generar el plan. Usando plan por defecto.');
       setPlan(DEFAULT_PLAN);
     } finally {
       setRegenerating(false);

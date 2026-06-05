@@ -59,14 +59,18 @@ export const useTimerStore = create<TimerState>()(
           return { config: newConfig, totalTimeLeft };
         }),
 
-      startTimer: () =>
+      startTimer: () => {
+        const { config } = get();
         set({
           status: 'running',
           currentRound: 1,
-          timeLeft: get().config.round_duration,
-          totalTimeLeft: calculateTotalTime(get().config),
+          timeLeft: config.round_duration,
+          totalTimeLeft: calculateTotalTime(config),
           pausedAt: null,
-        }),
+        });
+        // Sound: Start Session
+        import('@/lib/notifications').then(({ soundManager }) => soundManager.play('finish'));
+      },
 
       stopTimer: () => set({ status: 'idle', sessionSource: null, pausedAt: null }),
 
@@ -132,31 +136,58 @@ export const useTimerStore = create<TimerState>()(
 
         const newTimeLeft = timeLeft - 1;
 
+        // --- Sound Logic ---
+        const isWork = status === 'running' || status === 'warning';
+        const duration = isWork ? config.round_duration : config.rest_duration;
+        const halfway = Math.floor(duration / 2);
+
+        // Sound: Halfway (Only for Work)
+        if (isWork && newTimeLeft === halfway) {
+          import('@/lib/notifications').then(({ soundManager }) => soundManager.play('halfway'));
+        } 
+        
+        // Sound: Warning Beeps (Last 3 seconds of any phase)
+        if (newTimeLeft <= 3 && newTimeLeft > 0) {
+          import('@/lib/notifications').then(({ soundManager }) => soundManager.play('beep'));
+        } 
+        
+        // Sound: Phase Finish
+        if (newTimeLeft === 0) {
+          import('@/lib/notifications').then(({ soundManager }) => soundManager.play('finish'));
+        }
+        // --- End Sound Logic ---
+
         if (newTimeLeft <= 0) {
-          if (status === 'running' || status === 'warning') {
+          if (isWork) {
             if (currentRound < config.rounds) {
+              // Transition to Rest
               set({
                 status: 'resting',
                 timeLeft: config.rest_duration,
                 totalTimeLeft: get().totalTimeLeft - 1,
               });
+              // Sound: Start of Rest
+              import('@/lib/notifications').then(({ soundManager }) => soundManager.play('finish'));
             } else {
               set({ status: 'finished', timeLeft: 0, totalTimeLeft: 0 });
             }
           } else if (status === 'resting') {
+            // Transition to Work
             set({
               status: 'running',
               currentRound: currentRound + 1,
               timeLeft: config.round_duration,
               totalTimeLeft: get().totalTimeLeft - 1,
             });
+            // Sound: Start of Round
+            import('@/lib/notifications').then(({ soundManager }) => soundManager.play('finish'));
           }
         } else {
-          const isWarning = (status === 'running' || status === 'warning') && newTimeLeft <= config.warning_seconds;
+          const isWarning = isWork && newTimeLeft <= config.warning_seconds;
           set({
             timeLeft: newTimeLeft,
             totalTimeLeft: get().totalTimeLeft - 1,
-            status: isWarning ? 'warning' : status === 'warning' && newTimeLeft > config.warning_seconds ? 'running' : status,
+            status: isWarning ? 'warning' : (status === 'warning' && newTimeLeft > config.warning_seconds ? 'running' : status),
           });
         }
       },

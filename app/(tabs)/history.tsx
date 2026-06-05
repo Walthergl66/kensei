@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { View, Text, ScrollView, RefreshControl, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { getSessions } from '@/lib/supabase';
@@ -20,6 +21,31 @@ const disciplineColors: Record<string, string> = {
   both: '#E8C547',
 };
 
+const MOCK_SESSIONS: Session[] = [
+  {
+    id: '1',
+    user_id: 'guest',
+    date: '2026-06-01',
+    discipline: 'boxing',
+    duration_minutes: 30,
+    rounds_completed: 3,
+    rating: 5,
+    notes: 'Excelente sesion de sparring técnico.',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: '2',
+    user_id: 'guest',
+    date: '2026-05-30',
+    discipline: 'mma',
+    duration_minutes: 45,
+    rounds_completed: 5,
+    rating: 4,
+    notes: 'Enfoque en grappling y derribos.',
+    created_at: new Date().toISOString(),
+  },
+];
+
 export default function HistoryScreen() {
   const { session, isDevMode } = useUserStore();
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -28,7 +54,7 @@ export default function HistoryScreen() {
 
   async function loadSessions() {
     if (isDevMode || !session?.user?.id) {
-      setSessions([]);
+      setSessions(MOCK_SESSIONS);
       setLoadingError(false);
       return;
     }

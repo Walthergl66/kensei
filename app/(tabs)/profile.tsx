@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, Alert, SafeAreaView, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, ScrollView, Alert, TouchableOpacity, Switch } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUserStore } from '@/stores/userStore';
@@ -222,7 +223,7 @@ export default function ProfileScreen() {
             variant="outline"
           />
           <Button
-            title={isDevMode ? 'Salir del modo desarrollo' : 'Cerrar sesion'}
+            title="Cerrar sesion"
             onPress={handleSignOut}
             variant="danger"
           />

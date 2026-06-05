@@ -1,5 +1,76 @@
-import { OLLAMA_BASE_URL, OLLAMA_MODEL } from '@/constants';
+import { GROQ_API_KEY, GROQ_MODEL, GROQ_API_URL } from '@/constants';
 import { UserProfile, TrainingPlan } from '@/types';
+
+const TIMEOUT_MS = 20000;
+const MAX_RETRIES = 3;
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const fetchWithTimeout = (url: string, options: RequestInit, timeout: number = TIMEOUT_MS) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(id));
+};
+
+const callGroq = async (systemPrompt: string, userMessage: string): Promise<string> => {
+  if (!GROQ_API_KEY) {
+    throw new Error('API key de Groq no configurada. Agrega EXPO_PUBLIC_GROQ_API_KEY en .env.local');
+  }
+
+  const response = await fetchWithTimeout(GROQ_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw new Error(`Groq API error (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  const text = data?.choices?.[0]?.message?.content;
+
+  if (!text) {
+    throw new Error('Groq devolvio una respuesta vacia');
+  }
+
+  return text.trim();
+};
+
+const callGroqWithRetry = async (systemPrompt: string, userMessage: string): Promise<string> => {
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await callGroq(systemPrompt, userMessage);
+    } catch (error: any) {
+      lastError = error;
+
+      if (error.message?.includes('(429') || error.message?.includes('(503')) {
+        if (attempt < MAX_RETRIES) {
+          const delay = 1000 * Math.pow(2, attempt);
+          console.warn(`Groq rate limited, retrying in ${delay}ms (attempt ${attempt}/${MAX_RETRIES})`);
+          await sleep(delay);
+          continue;
+        }
+      }
+
+      break;
+    }
+  }
+
+  throw lastError || new Error('Groq call failed after retries');
+};
 
 const getSystemPrompt = (profile: UserProfile) => `
 Eres Kensei, un Head Coach de élite en deportes de contacto (Boxeo y MMA). Tu misión es diseñar periodizaciones tácticas y físicas ultra-personalizadas. No generes planes genéricos. Cada bit del JSON debe responder al perfil del atleta.
@@ -47,8 +118,19 @@ REGLAS DE ORO:
 2. ADAPTACIÓN A LESIONES: Si hay lesiones (ej: 'hombro'), PROHIBE ejercicios de impacto en esa zona y sustituye por movilidad.
 3. DISTRIBUCIÓN: Reparte los ${profile.days_per_week} días de forma lógica (ej: Lunes, Miércoles, Viernes para 3 días).
 4. RIGOR TÉCNICO: Usa terminología real (Jab, Cross, Sprawl, Clinch, etc).
-5. RESPUESTA: UNICAMENTE el JSON. Sin preámbulos.
-`;
+5. RESPUESTA: UNICAMENTE el JSON. Sin preámbulos.`;
+
+export async function getCoachAdvice(profile: UserProfile): Promise<string> {
+  const systemPrompt = `Eres Kensei, Head Coach de boxeo y MMA. Da un consejo corto (máximo 2 frases) y motivador basado en el perfil del usuario. Sé directo y usa terminología de combate.`;
+  const userMessage = `Perfil: ${profile.discipline}, nivel ${profile.level}, objetivo ${profile.goal}.`;
+
+  try {
+    return await callGroqWithRetry(systemPrompt, userMessage);
+  } catch (error) {
+    console.warn('Advice failed:', error);
+    return 'Domina lo básico antes de buscar lo complejo. ¡A entrenar!';
+  }
+}
 
 export async function generateTrainingPlan(profile: UserProfile): Promise<TrainingPlan> {
   const userMessage = `
@@ -63,30 +145,12 @@ export async function generateTrainingPlan(profile: UserProfile): Promise<Traini
     - Lesiones o limitaciones: ${profile.injuries ?? 'Ninguna'}
   `;
 
-  const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      stream: false,
-      messages: [
-        { role: 'system', content: getSystemPrompt(profile) },
-        { role: 'user', content: userMessage },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Ollama no esta disponible. Verifica que el servidor este corriendo en ${OLLAMA_BASE_URL}`);
-  }
-
-  const data = await response.json();
-  const raw: string = data?.message?.content ?? '';
+  const raw = await callGroqWithRetry(getSystemPrompt(profile), userMessage);
 
   try {
     const clean = raw.replace(/```json|```/g, '').trim();
     return JSON.parse(clean) as TrainingPlan;
   } catch {
-    throw new Error('El agente devolvio una respuesta invalida. Intenta de nuevo.');
+    throw new Error('Groq devolvio una respuesta invalida. Intenta de nuevo.');
   }
 }

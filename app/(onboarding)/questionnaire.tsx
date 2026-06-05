@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, Text, TextInput, Alert, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUserStore } from '@/stores/userStore';
@@ -131,69 +132,73 @@ export default function QuestionnaireScreen() {
 
   if (step > STEPS.length - 1) {
     return (
-      <View className="flex-1 bg-[#0A0A0A] px-6 pt-12">
-        <View className="flex-row items-center mb-4">
-          <TouchableOpacity onPress={handleBack} className="mr-4">
-            <Ionicons name="chevron-back" size={24} color="#E8C547" />
-          </TouchableOpacity>
-          <StepIndicator current={step} total={totalSteps} />
+      <SafeAreaView className="flex-1 bg-[#0A0A0A]">
+        <View className="flex-1 px-6 pt-4">
+          <View className="flex-row items-center mb-4">
+            <TouchableOpacity onPress={handleBack} className="mr-4">
+              <Ionicons name="chevron-back" size={24} color="#E8C547" />
+            </TouchableOpacity>
+            <StepIndicator current={step} total={totalSteps} />
+          </View>
+          <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
+            <InjuriesStep value={injuries} onChange={setInjuries} />
+          </ScrollView>
+          <View className="pb-8 gap-2">
+            <Button title="Finalizar" onPress={handleSubmit} loading={loading} disabled={loading} size="lg" />
+            <Button title="Omitir" onPress={handleSubmit} variant="ghost" />
+          </View>
         </View>
-        <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
-          <InjuriesStep value={injuries} onChange={setInjuries} />
-        </ScrollView>
-        <View className="pb-8 gap-2">
-          <Button title="Finalizar" onPress={handleSubmit} loading={loading} disabled={loading} size="lg" />
-          <Button title="Omitir" onPress={handleSubmit} variant="ghost" />
-        </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View className="flex-1 bg-[#0A0A0A] px-6 pt-12">
-      <View className="flex-row items-center mb-4">
-        {step > 0 && (
-          <TouchableOpacity onPress={handleBack} className="mr-4">
-            <Ionicons name="chevron-back" size={24} color="#E8C547" />
-          </TouchableOpacity>
-        )}
-        <StepIndicator current={step} total={totalSteps} />
-      </View>
-      <View className="flex-1 justify-center">
-        <Text className="text-[#F5F5F5] text-2xl font-bold mb-8 tracking-tight">{currentStep.question}</Text>
-
-        {currentStep.type === 'text' ? (
-          <TextInput
-            className="bg-[#141414] text-[#F5F5F5] rounded-2xl p-5 border border-[#1E1E1E] text-lg"
-            placeholder="Tu nombre"
-            placeholderTextColor="#666666"
-            value={answers.name || ''}
-            onChangeText={(text) => setAnswers(prev => ({ ...prev, name: text }))}
-            autoFocus
-          />
-        ) : (
-          currentStep.options?.map((opt: { label: string; description?: string; value: string | number }) => (
-            <QuestionOption
-              key={String(opt.value)}
-              label={opt.label}
-              description={opt.description}
-              selected={answers[currentStep.key] === opt.value}
-              onSelect={() => handleAnswer(opt.value)}
-            />
-          ))
-        )}
-      </View>
-
-      {currentStep.type === 'text' && (
-        <View className="pb-8">
-          <Button
-            title="Siguiente"
-            onPress={handleNext}
-            disabled={!answers.name?.trim()}
-            size="lg"
-          />
+    <SafeAreaView className="flex-1 bg-[#0A0A0A]">
+      <View className="flex-1 px-6 pt-4">
+        <View className="flex-row items-center mb-4">
+          {step > 0 && (
+            <TouchableOpacity onPress={handleBack} className="mr-4">
+              <Ionicons name="chevron-back" size={24} color="#E8C547" />
+            </TouchableOpacity>
+          )}
+          <StepIndicator current={step} total={totalSteps} />
         </View>
-      )}
-    </View>
+        <View className="flex-1 justify-center">
+          <Text className="text-[#F5F5F5] text-2xl font-bold mb-8 tracking-tight">{currentStep.question}</Text>
+
+          {currentStep.type === 'text' ? (
+            <TextInput
+              className="bg-[#141414] text-[#F5F5F5] rounded-2xl p-5 border border-[#1E1E1E] text-lg"
+              placeholder="Tu nombre"
+              placeholderTextColor="#666666"
+              value={answers.name || ''}
+              onChangeText={(text) => setAnswers(prev => ({ ...prev, name: text }))}
+              autoFocus
+            />
+          ) : (
+            currentStep.options?.map((opt: { label: string; description?: string; value: string | number }) => (
+              <QuestionOption
+                key={String(opt.value)}
+                label={opt.label}
+                description={opt.description}
+                selected={answers[currentStep.key] === opt.value}
+                onSelect={() => handleAnswer(opt.value)}
+              />
+            ))
+          )}
+        </View>
+
+        {currentStep.type === 'text' && (
+          <View className="pb-8">
+            <Button
+              title="Siguiente"
+              onPress={handleNext}
+              disabled={!answers.name?.trim()}
+              size="lg"
+            />
+          </View>
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
