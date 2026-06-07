@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { UserProfile } from '@/types';
+import { PendingOnboarding, UserProfile } from '@/types';
 import { supabase } from '@/lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 
@@ -13,12 +13,15 @@ interface UserState {
   isDevMode: boolean;
   remindersEnabled: boolean;
   reminderTime: { hour: number; minute: number };
+  pendingOnboarding: PendingOnboarding | null;
   setProfile: (profile: UserProfile | null) => void;
   setSession: (session: Session | null) => void;
   setIsLoading: (loading: boolean) => void;
   setIsOnboarded: (onboarded: boolean) => void;
   setDevMode: (dev: boolean) => void;
   setReminders: (enabled: boolean, time?: { hour: number; minute: number }) => void;
+  setPendingOnboarding: (pending: PendingOnboarding | null) => void;
+  clearPendingOnboarding: () => void;
   signOut: () => Promise<void>;
 }
 
@@ -32,6 +35,7 @@ export const useUserStore = create<UserState>()(
       isDevMode: false,
       remindersEnabled: false,
       reminderTime: { hour: 9, minute: 0 },
+      pendingOnboarding: null,
       setProfile: (profile) => set({ profile }),
       setSession: (session) => set({ session }),
       setIsLoading: (isLoading) => set({ isLoading }),
@@ -41,6 +45,8 @@ export const useUserStore = create<UserState>()(
         remindersEnabled, 
         reminderTime: reminderTime || state.reminderTime 
       })),
+      setPendingOnboarding: (pendingOnboarding) => set({ pendingOnboarding }),
+      clearPendingOnboarding: () => set({ pendingOnboarding: null }),
       signOut: async () => {
         if (supabase) {
           await supabase.auth.signOut();
@@ -54,6 +60,7 @@ export const useUserStore = create<UserState>()(
       partialize: (state) => ({ 
         remindersEnabled: state.remindersEnabled, 
         reminderTime: state.reminderTime,
+        pendingOnboarding: state.pendingOnboarding,
         isOnboarded: state.isOnboarded,
         isDevMode: state.isDevMode
       }),

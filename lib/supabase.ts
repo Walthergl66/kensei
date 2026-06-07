@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { UserProfile, NewSession, Session, TrainingPlan } from '@/types';
+import { UserProfile, UserProfileInput, NewSession, Session, TrainingPlan } from '@/types';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
@@ -31,7 +31,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 
 export async function saveUserProfile(
   userId: string,
-  profile: Omit<UserProfile, 'id' | 'user_id' | 'created_at'>
+  profile: UserProfileInput
 ): Promise<void> {
   if (!supabase) return;
   const { error } = await supabase.from('user_profile').upsert({

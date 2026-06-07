@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { completePendingOnboarding } from '@/lib/onboarding';
+import { useUserStore } from '@/stores/userStore';
+import { useTrainingStore } from '@/stores/trainingStore';
 import { validateEmail } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 
@@ -12,6 +15,10 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const { from } = useLocalSearchParams<{ from?: string }>();
+  const { pendingOnboarding, setProfile, setIsOnboarded, clearPendingOnboarding } = useUserStore();
+  const { setPlan } = useTrainingStore();
+  const hasPendingOnboarding = from === 'onboarding' && !!pendingOnboarding;
 
   async function handleRegister() {
     if (!email.trim()) { Alert.alert('Error', 'Ingresa tu email'); return; }
@@ -25,12 +32,35 @@ export default function RegisterScreen() {
     if (!supabase) return;
 
     setLoading(true);
-    const { error } = await supabase.auth.signUp({ email: email.trim(), password });
-    setLoading(false);
+    const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
     if (error) {
+      setLoading(false);
       Alert.alert('Error', error.message);
     } else {
-      Alert.alert('Registro exitoso', 'Revisa tu email para confirmar tu cuenta.');
+      if (data.session?.user && pendingOnboarding) {
+        try {
+          const completedProfile = await completePendingOnboarding(data.session.user.id, pendingOnboarding);
+          setProfile(completedProfile);
+          setPlan(pendingOnboarding.plan);
+          setIsOnboarded(true);
+          clearPendingOnboarding();
+          setLoading(false);
+          router.replace('/(tabs)/home');
+          return;
+        } catch (saveError) {
+          setLoading(false);
+          Alert.alert('Error', saveError instanceof Error ? saveError.message : 'No se pudo guardar tu rutina');
+          return;
+        }
+      }
+
+      setLoading(false);
+      Alert.alert(
+        'Registro exitoso',
+        hasPendingOnboarding
+          ? 'Revisa tu email para confirmar tu cuenta. Al iniciar sesion guardaremos tu rutina personalizada.'
+          : 'Revisa tu email para confirmar tu cuenta.'
+      );
       router.replace('/(auth)/login');
     }
   }
@@ -45,7 +75,9 @@ export default function RegisterScreen() {
           <Ionicons name="flame" size={32} color="#E8C547" />
         </View>
         <Text className="text-[#E8C547] text-3xl font-bold tracking-tight">Kensei</Text>
-        <Text className="text-[#666666] text-sm mt-2">Crea tu cuenta</Text>
+        <Text className="text-[#666666] text-sm mt-2 text-center">
+          {hasPendingOnboarding ? 'Crea tu cuenta para guardar tu rutina' : 'Crea tu cuenta'}
+        </Text>
       </View>
 
       <Text className="text-[#666666] text-xs font-semibold uppercase tracking-wider mb-2 ml-1">Email</Text>

@@ -3,7 +3,9 @@ import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { completePendingOnboarding } from '@/lib/onboarding';
 import { useUserStore } from '@/stores/userStore';
+import { useTrainingStore } from '@/stores/trainingStore';
 import { validateEmail } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 
@@ -12,7 +14,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { setDevMode } = useUserStore();
+  const { pendingOnboarding, setDevMode, setProfile, setIsOnboarded, clearPendingOnboarding } = useUserStore();
+  const { setPlan } = useTrainingStore();
 
   async function handleLogin() {
     if (!supabase) return;
@@ -21,7 +24,24 @@ export default function LoginScreen() {
     if (!password) { Alert.alert('Error', 'Ingresa tu contrasena'); return; }
 
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (!error && data.session?.user && pendingOnboarding) {
+      try {
+        const completedProfile = await completePendingOnboarding(data.session.user.id, pendingOnboarding);
+        setProfile(completedProfile);
+        setPlan(pendingOnboarding.plan);
+        setIsOnboarded(true);
+        clearPendingOnboarding();
+        setLoading(false);
+        router.replace('/(tabs)/home');
+        return;
+      } catch (saveError) {
+        setLoading(false);
+        Alert.alert('Error', saveError instanceof Error ? saveError.message : 'No se pudo guardar tu rutina');
+        return;
+      }
+    }
+
     setLoading(false);
     if (error) Alert.alert('Error', error.message);
   }
@@ -41,7 +61,9 @@ export default function LoginScreen() {
           <Ionicons name="flame" size={32} color="#E8C547" />
         </View>
         <Text className="text-[#E8C547] text-3xl font-bold tracking-tight">Kensei</Text>
-        <Text className="text-[#666666] text-sm mt-2">Inicia sesion para continuar</Text>
+        <Text className="text-[#666666] text-sm mt-2 text-center">
+          {pendingOnboarding ? 'Inicia sesion para guardar tu rutina' : 'Inicia sesion para continuar'}
+        </Text>
       </View>
 
       <Text className="text-[#666666] text-xs font-semibold uppercase tracking-wider mb-2 ml-1">Email</Text>
@@ -74,11 +96,19 @@ export default function LoginScreen() {
       </View>
 
       <Button title="Iniciar sesion" onPress={handleLogin} loading={loading} disabled={loading} size="lg" />
-      <TouchableOpacity onPress={() => router.push('/(auth)/register')} className="mt-5 items-center">
+      <TouchableOpacity onPress={() => router.push(pendingOnboarding ? '/(auth)/register?from=onboarding' : '/(auth)/register')} className="mt-5 items-center">
         <Text className="text-[#666666] text-sm">
           No tienes cuenta? <Text className="text-[#E8C547] font-semibold">Registrate</Text>
         </Text>
       </TouchableOpacity>
+
+      {!pendingOnboarding && (
+        <TouchableOpacity onPress={() => router.replace('/(onboarding)/welcome')} className="mt-4 items-center">
+          <Text className="text-[#666666] text-sm">
+            Nuevo en Kensei? <Text className="text-[#E8C547] font-semibold">Haz tu encuesta inicial</Text>
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity onPress={handleDevMode} className="mt-8 items-center py-2">
         <Text className="text-[#555555] text-xs">Modo desarrollo (sin conexion)</Text>

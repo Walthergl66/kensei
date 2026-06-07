@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useUserStore } from '@/stores/userStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { supabase, getUserProfile, getActiveTrainingPlan } from '@/lib/supabase';
+import { completePendingOnboarding } from '@/lib/onboarding';
 import { DEFAULT_PLAN } from '@/constants';
 import { UserProfile } from '@/types';
 import '../global.css';
@@ -67,6 +68,16 @@ export default function RootLayout() {
 
   async function loadUserData(userId: string) {
     try {
+      const { pendingOnboarding, clearPendingOnboarding } = useUserStore.getState();
+      if (pendingOnboarding) {
+        const completedProfile = await completePendingOnboarding(userId, pendingOnboarding);
+        setProfile(completedProfile);
+        setPlan(pendingOnboarding.plan);
+        setIsOnboarded(true);
+        clearPendingOnboarding();
+        return;
+      }
+
       const profile = await getUserProfile(userId);
       if (profile) {
         setProfile(profile);

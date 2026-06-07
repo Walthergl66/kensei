@@ -8,7 +8,7 @@ import { useTrainingStore } from '@/stores/trainingStore';
 import { supabase, saveUserProfile, saveTrainingPlan, deactivateOtherPlans } from '@/lib/supabase';
 import { generateTrainingPlan } from '@/lib/agent';
 import { DEFAULT_PLAN } from '@/constants';
-import { Discipline, Goal, Level, Equipment, FitnessLevel, UserProfile } from '@/types';
+import { Discipline, Goal, Level, Equipment, FitnessLevel, QuestionnaireData, UserProfile, UserProfileInput } from '@/types';
 import Button from '@/components/ui/Button';
 import StepIndicator from '@/components/onboarding/StepIndicator';
 import QuestionOption from '@/components/onboarding/QuestionOption';
@@ -58,10 +58,19 @@ const STEPS = [
 
 export default function QuestionnaireScreen() {
   const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [answers, setAnswers] = useState<QuestionnaireData>({
+    name: '',
+    discipline: null,
+    goal: null,
+    level: null,
+    days_per_week: null,
+    equipment: null,
+    fitness_level: null,
+    injuries: '',
+  });
   const [injuries, setInjuries] = useState('');
   const [loading, setLoading] = useState(false);
-  const { session, isDevMode, setProfile, setIsOnboarded } = useUserStore();
+  const { session, isDevMode, setProfile, setIsOnboarded, setPendingOnboarding } = useUserStore();
   const { setPlan } = useTrainingStore();
 
   const currentStep = STEPS[step];
@@ -69,7 +78,7 @@ export default function QuestionnaireScreen() {
   const totalSteps = STEPS.length + 1;
 
   function handleAnswer(value: string | number) {
-    setAnswers(prev => ({ ...prev, [currentStep.key]: value }));
+    setAnswers(prev => ({ ...prev, [currentStep.key]: value } as QuestionnaireData));
     if (step < STEPS.length - 1) setStep(step + 1);
     else setStep(step + 1);
   }
@@ -84,16 +93,21 @@ export default function QuestionnaireScreen() {
   }
 
   async function handleSubmit() {
+    if (!answers.name.trim() || !answers.discipline || !answers.goal || !answers.level || !answers.days_per_week || !answers.equipment || !answers.fitness_level) {
+      Alert.alert('Faltan datos', 'Completa la encuesta para crear una rutina personalizada.');
+      return;
+    }
+
     setLoading(true);
 
-    const profileData = {
-      name: answers.name,
-      discipline: answers.discipline as Discipline,
-      goal: answers.goal as Goal,
-      level: answers.level as Level,
-      days_per_week: answers.days_per_week as number,
-      equipment: answers.equipment as Equipment,
-      fitness_level: answers.fitness_level as FitnessLevel,
+    const profileData: UserProfileInput = {
+      name: answers.name.trim(),
+      discipline: answers.discipline,
+      goal: answers.goal,
+      level: answers.level,
+      days_per_week: answers.days_per_week,
+      equipment: answers.equipment,
+      fitness_level: answers.fitness_level,
       injuries: injuries || null,
     };
 
@@ -107,6 +121,13 @@ export default function QuestionnaireScreen() {
     }
 
     if (isDevMode || !supabase || !session?.user?.id) {
+      if (!isDevMode && supabase && !session?.user?.id) {
+        setPendingOnboarding({ profileData, plan: generatedPlan });
+        setLoading(false);
+        router.replace('/(auth)/register?from=onboarding');
+        return;
+      }
+
       setProfile(fullProfile);
       setPlan(generatedPlan);
       setIsOnboarded(true);
@@ -123,8 +144,8 @@ export default function QuestionnaireScreen() {
       setPlan(generatedPlan);
       setIsOnboarded(true);
       router.replace('/(tabs)/home');
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Ocurrio un error al guardar tu perfil');
+    } catch (error) {
+      Alert.alert('Error', error instanceof Error ? error.message : 'Ocurrio un error al guardar tu perfil');
     } finally {
       setLoading(false);
     }

@@ -20,6 +20,13 @@ export interface UserProfile {
   created_at: string;
 }
 
+export type UserProfileInput = Omit<UserProfile, 'id' | 'user_id' | 'created_at'>;
+
+export interface PendingOnboarding {
+  profileData: UserProfileInput;
+  plan: TrainingPlan;
+}
+
 export interface Exercise {
   name: string;
   description: string;
@@ -81,5 +88,4 @@ export interface QuestionnaireData {
   fitness_level: FitnessLevel | null;
   injuries: string;
 }
-
 

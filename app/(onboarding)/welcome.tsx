@@ -38,7 +38,10 @@ export default function WelcomeScreen() {
           ))}
         </View>
 
-        <Button title="Comenzar" onPress={() => router.push('/(onboarding)/questionnaire')} size="lg" />
+        <View className="gap-3">
+          <Button title="Comenzar encuesta" onPress={() => router.push('/(onboarding)/questionnaire')} size="lg" />
+          <Button title="Ya tengo cuenta" onPress={() => router.push('/(auth)/login')} variant="ghost" />
+        </View>
       </View>
     </SafeAreaView>
   );

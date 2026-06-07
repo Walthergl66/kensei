@@ -687,6 +687,16 @@ Se construyó la aplicación completa desde cero. Archivos creados:
 - [x] `timer.tsx`: boton de guardado rapido de preset desde header y desde tarjeta de inicio.
 - [x] `lib/notifications.ts`: stub `scheduleDailyReminder()` tipado con hora/minuto para mantener TypeScript limpio.
 
+### 28. Onboarding previo a registro y datos por usuario (Junio 2026)
+- [x] Flujo inicial actualizado: usuarios sin sesion llegan a bienvenida/encuesta, no directo a login.
+- [x] `userStore.ts`: nuevo `pendingOnboarding` persistido con perfil de encuesta y plan generado.
+- [x] `questionnaire.tsx`: al finalizar sin sesion real genera rutina, guarda onboarding pendiente y envia a registro.
+- [x] `register.tsx`: si Supabase entrega sesion tras registro, guarda perfil y plan inmediatamente bajo el `user_id`.
+- [x] `login.tsx`: si hay onboarding pendiente tras confirmar email, lo guarda al iniciar sesion.
+- [x] `app/_layout.tsx`: completa onboarding pendiente automaticamente cuando detecta una sesion activa.
+- [x] `lib/onboarding.ts`: helper central `completePendingOnboarding()` para guardar perfil, desactivar planes previos y guardar el plan activo.
+- [x] Timers guardados siguen aislados por usuario mediante `TimerPreset.userId` y `getPresetsForUser()`.
+
 ---
 
 *Ultima actualizacion: Junio 2026*

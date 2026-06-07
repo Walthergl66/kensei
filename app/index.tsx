@@ -22,7 +22,7 @@ export default function IndexScreen() {
         router.replace('/(onboarding)/welcome');
       }
     } else {
-      router.replace('/(auth)/login');
+      router.replace('/(onboarding)/welcome');
     }
   }, [session, isLoading, isOnboarded, isDevMode]);
 
