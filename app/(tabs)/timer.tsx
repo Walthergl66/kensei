@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { View, Text, AppState, AppStateStatus, Alert, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useTimerStore } from '@/stores/timerStore';
+import { TimerPreset, useTimerStore } from '@/stores/timerStore';
 import TimerDisplay from '@/components/timer/TimerDisplay';
 import TimerConfigComponent from '@/components/timer/TimerConfig';
 import SessionSaveSheet from '@/components/timer/SessionSaveSheet';
@@ -22,6 +22,47 @@ function formatDuration(totalSeconds: number): string {
   return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
+function PresetCard({ preset, selected, onPress, onDelete }: {
+  preset: TimerPreset;
+  selected: boolean;
+  onPress: () => void;
+  onDelete: () => void;
+}) {
+  const isSystem = preset.userId === '__system__';
+  const totalSeconds = preset.config.rounds * preset.config.round_duration + (preset.config.rounds - 1) * preset.config.rest_duration;
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      onLongPress={isSystem ? undefined : onDelete}
+      activeOpacity={0.84}
+      className={`rounded-2xl px-5 py-4 border ${selected ? 'bg-[#E8C547] border-[#E8C547]' : 'bg-[#141414] border-[#1E1E1E]'}`}
+      style={{ shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 }}
+    >
+      <View className="flex-row items-center justify-between">
+        <View className="flex-row items-center flex-1 pr-4">
+          <View className={`w-11 h-11 rounded-full items-center justify-center mr-4 ${selected ? 'bg-[#0A0A0A]/10' : 'bg-[#E8C547]/10'}`}>
+            <Ionicons name={isSystem ? 'sparkles' : 'person'} size={21} color={selected ? '#0A0A0A' : '#E8C547'} />
+          </View>
+          <View className="flex-1">
+            <Text className={`text-lg font-black tracking-tight ${selected ? 'text-[#0A0A0A]' : 'text-[#F5F5F5]'}`}>{preset.name}</Text>
+            <Text className={`text-xs font-semibold mt-1 ${selected ? 'text-[#0A0A0A]/65' : 'text-[#888888]'}`}>
+              {preset.config.rounds} rondas · {formatDuration(preset.config.round_duration)} trabajo · {formatDuration(preset.config.rest_duration)} descanso
+            </Text>
+          </View>
+        </View>
+
+        <View className="items-end">
+          <Text className={`text-xl font-black font-mono ${selected ? 'text-[#0A0A0A]' : 'text-[#E8C547]'}`}>{formatDuration(totalSeconds)}</Text>
+          <Text className={`text-[10px] font-black uppercase tracking-wider mt-1 ${selected ? 'text-[#0A0A0A]/50' : 'text-[#888888]'}`}>
+            {isSystem ? 'Sistema' : 'Personal'}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 export default function TimerScreen() {
   const { config, status, currentRound, timeLeft, sessionSource, presets, setConfig, startTimer, stopTimer, resetTimer, tick, pauseTimer, resumeTimer, savePreset, loadPreset, deletePreset, getPresetsForUser } = useTimerStore();
   const { session, isDevMode, profile } = useUserStore();
@@ -30,6 +71,7 @@ export default function TimerScreen() {
   const [saving, setSaving] = useState(false);
   const [presetName, setPresetName] = useState('');
   const [showPresetModal, setShowPresetModal] = useState(false);
+  const [timerTab, setTimerTab] = useState<'new' | 'saved'>('new');
 
   const currentUserId = isDevMode ? 'dev' : (session?.user?.id || profile?.user_id || 'guest');
   const userPresets = useMemo(() => getPresetsForUser(currentUserId), [presets, currentUserId]);
@@ -106,7 +148,7 @@ export default function TimerScreen() {
           <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 18, paddingBottom: 28 }}>
             <View className="flex-row items-center justify-between mb-7">
               <View>
-                <Text className="text-[#666666] text-xs font-black uppercase tracking-widest mb-2">Temporizador</Text>
+                <Text className="text-[#888888] text-xs font-black uppercase tracking-widest mb-2">Temporizador</Text>
                 <Text className="text-[#F5F5F5] text-4xl font-black tracking-tight">Timer Kensei</Text>
               </View>
               <TouchableOpacity
@@ -125,68 +167,65 @@ export default function TimerScreen() {
               </View>
             )}
 
-            {userPresets.length > 0 && (
-              <>
-                <View className="flex-row justify-between items-center mb-3">
-                  <Text className="text-[#666666] text-xs font-semibold uppercase tracking-widest ml-1">Tus preconfigurados</Text>
+            <TimerConfigComponent
+              config={config}
+              onChange={setConfig}
+              disabled={isActive}
+              activeTab={timerTab}
+              onTabChange={setTimerTab}
+            />
+
+            {timerTab === 'saved' && (
+              <View className="gap-3">
+                <View className="flex-row justify-between items-center px-1">
+                  <Text className="text-[#888888] text-xs font-semibold uppercase tracking-widest">Timers guardados</Text>
                   <TouchableOpacity onPress={() => { setPresetName(''); setShowPresetModal(true); }}>
                     <Text className="text-[#E8C547] text-xs font-semibold">+ GUARDAR ACTUAL</Text>
                   </TouchableOpacity>
                 </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-3 mb-6">
-                  {userPresets.map((preset) => {
-                    const isSelected = JSON.stringify(config) === JSON.stringify(preset.config);
-                    const mins = Math.floor(preset.config.round_duration / 60);
-                    const secs = preset.config.round_duration % 60;
-                    return (
-                      <TouchableOpacity
-                        key={preset.id}
-                        onPress={() => loadPreset(preset)}
-                        onLongPress={() => {
-                          Alert.alert('Eliminar preset', `Eliminar "${preset.name}"?`, [
-                            { text: 'Cancelar', style: 'cancel' },
-                            { text: 'Eliminar', style: 'destructive', onPress: () => deletePreset(preset.id) },
-                          ]);
-                        }}
-                        className={`px-4 py-3 rounded-xl border ${isSelected ? 'bg-[#E8C547] border-[#E8C547]' : 'bg-[#141414] border-[#1E1E1E]'} min-w-[100px] items-center`}
-                      >
-                        <Text className={`font-bold ${isSelected ? 'text-[#0A0A0A]' : 'text-[#F5F5F5]'}`}>
-                          {preset.name}
-                        </Text>
-                        <Text className={`text-[10px] mt-1 ${isSelected ? 'text-[#0A0A0A]/60' : 'text-[#666666]'}`}>
-                          {preset.config.rounds}R &middot; {mins}m{secs > 0 ? ` ${secs}s` : ''}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </>
+
+                {userPresets.map((preset) => {
+                  const isSelected = JSON.stringify(config) === JSON.stringify(preset.config);
+                  return (
+                    <PresetCard
+                      key={preset.id}
+                      preset={preset}
+                      selected={isSelected}
+                      onPress={() => loadPreset(preset)}
+                      onDelete={() => {
+                        Alert.alert('Eliminar timer', `Eliminar "${preset.name}"?`, [
+                          { text: 'Cancelar', style: 'cancel' },
+                          { text: 'Eliminar', style: 'destructive', onPress: () => deletePreset(preset.id) },
+                        ]);
+                      }}
+                    />
+                  );
+                })}
+              </View>
             )}
 
-            <TimerConfigComponent config={config} onChange={setConfig} disabled={isActive} />
-
-            <View className="rounded-[28px] bg-[#35D66B] mt-7 px-6 py-7 min-h-[210px] justify-between">
+            <View className="rounded-[28px] bg-[#E8C547] mt-7 px-6 py-7 min-h-[210px] justify-between">
               <View className="flex-row items-start justify-between">
                 <View>
-                  <Text className="text-white/80 text-xs font-black uppercase tracking-widest">Total</Text>
-                  <Text className="text-white text-6xl font-black font-mono mt-1">{formatDuration(totalConfiguredSeconds)}</Text>
+                  <Text className="text-[#0A0A0A]/80 text-xs font-black uppercase tracking-widest">Total</Text>
+                  <Text className="text-[#0A0A0A] text-6xl font-black font-mono mt-1">{formatDuration(totalConfiguredSeconds)}</Text>
                 </View>
                 <TouchableOpacity
                   onPress={() => { setPresetName(''); setShowPresetModal(true); }}
-                  className="px-4 py-3 rounded-full bg-white/15"
+                  className="px-4 py-3 rounded-full bg-[#0A0A0A]/15"
                   activeOpacity={0.82}
                 >
-                  <Text className="text-white font-bold">Guardar</Text>
+                  <Text className="text-[#0A0A0A] font-bold">Guardar</Text>
                 </TouchableOpacity>
               </View>
 
               <View className="items-center">
                 <TouchableOpacity
                   onPress={() => { setShowSave(false); startTimer(); }}
-                  className="w-24 h-24 rounded-full border-[6px] border-white items-center justify-center"
+                  className="w-24 h-24 rounded-full border-[6px] border-[#0A0A0A] items-center justify-center"
                   activeOpacity={0.82}
                 >
-                  <Ionicons name="play" size={46} color="#FFFFFF" style={{ marginLeft: 5 }} />
+                  <Ionicons name="play" size={46} color="#0A0A0A" style={{ marginLeft: 5 }} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -230,7 +269,7 @@ export default function TimerScreen() {
               <TextInput
                 className="bg-[#0A0A0A] text-[#F5F5F5] rounded-2xl p-4 mb-6 border border-[#1E1E1E]"
                 placeholder="Nombre del preset (ej. Boxeo suave)"
-                placeholderTextColor="#555555"
+                placeholderTextColor="#666666"
                 value={presetName}
                 onChangeText={setPresetName}
                 autoFocus
@@ -242,6 +281,8 @@ export default function TimerScreen() {
                   onPress={() => {
                     if (presetName.trim()) {
                       savePreset(presetName.trim(), currentUserId);
+                      setTimerTab('saved');
+                      setPresetName('');
                       setShowPresetModal(false);
                     }
                   }}

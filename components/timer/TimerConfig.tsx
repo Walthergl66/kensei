@@ -8,6 +8,8 @@ interface TimerConfigProps {
   config: TimerConfigType;
   onChange: (config: Partial<TimerConfigType>) => void;
   disabled?: boolean;
+  activeTab: 'new' | 'saved';
+  onTabChange: (tab: 'new' | 'saved') => void;
 }
 
 type PickerTarget = 'round_duration' | 'rest_duration' | 'rounds' | 'warning_seconds';
@@ -261,7 +263,7 @@ function TimerPickerModal({ picker, config, onClose, onApply }: {
   );
 }
 
-export default function TimerConfig({ config, onChange, disabled }: TimerConfigProps) {
+export default function TimerConfig({ config, onChange, disabled, activeTab, onTabChange }: TimerConfigProps) {
   const [picker, setPicker] = useState<PickerState | null>(null);
 
   if (disabled) return null;
@@ -278,44 +280,52 @@ export default function TimerConfig({ config, onChange, disabled }: TimerConfigP
   return (
     <View>
       <View className="flex-row bg-[#1A1A1A] rounded-full p-1 mb-5 border border-[#242424]">
-        <Pressable className="flex-1 bg-[#F5F5F5] rounded-full py-3 items-center">
-          <Text className="text-[#0A0A0A] font-black">Nuevo timer</Text>
+        <Pressable
+          onPress={() => onTabChange('new')}
+          className={`flex-1 rounded-full py-3 items-center ${activeTab === 'new' ? 'bg-[#F5F5F5]' : ''}`}
+        >
+          <Text className={`font-black ${activeTab === 'new' ? 'text-[#0A0A0A]' : 'text-[#888888]'}`}>Nuevo timer</Text>
         </Pressable>
-        <Pressable className="flex-1 py-3 items-center">
-          <Text className="text-[#888888] font-bold">Mis timers</Text>
+        <Pressable
+          onPress={() => onTabChange('saved')}
+          className={`flex-1 rounded-full py-3 items-center ${activeTab === 'saved' ? 'bg-[#F5F5F5]' : ''}`}
+        >
+          <Text className={`font-black ${activeTab === 'saved' ? 'text-[#0A0A0A]' : 'text-[#888888]'}`}>Mis timers</Text>
         </Pressable>
       </View>
 
-      <View className="gap-3">
-        <ConfigRow
-          label="Trabajo"
-          value={formatDuration(config.round_duration)}
-          icon="play"
-          accent="#35D66B"
-          onPress={() => openPicker('round_duration', 'Trabajo', '#35D66B')}
-        />
-        <ConfigRow
-          label="Descanso"
-          value={formatDuration(config.rest_duration)}
-          icon="pause"
-          accent="#FF2F67"
-          onPress={() => openPicker('rest_duration', 'Descanso', '#FF2F67')}
-        />
-        <ConfigRow
-          label="Rondas"
-          value={`${config.rounds}`}
-          icon="sync"
-          accent="#6C63FF"
-          onPress={() => openPicker('rounds', 'Rondas', '#6C63FF')}
-        />
-        <ConfigRow
-          label="Aviso final"
-          value={formatDuration(config.warning_seconds)}
-          icon="alarm"
-          accent="#19C8D1"
-          onPress={() => openPicker('warning_seconds', 'Aviso final', '#19C8D1')}
-        />
-      </View>
+      {activeTab === 'new' && (
+        <View className="gap-3">
+          <ConfigRow
+            label="Trabajo"
+            value={formatDuration(config.round_duration)}
+            icon="play"
+            accent="#35D66B"
+            onPress={() => openPicker('round_duration', 'Trabajo', '#35D66B')}
+          />
+          <ConfigRow
+            label="Descanso"
+            value={formatDuration(config.rest_duration)}
+            icon="pause"
+            accent="#FF2F67"
+            onPress={() => openPicker('rest_duration', 'Descanso', '#FF2F67')}
+          />
+          <ConfigRow
+            label="Rondas"
+            value={`${config.rounds}`}
+            icon="sync"
+            accent="#6C63FF"
+            onPress={() => openPicker('rounds', 'Rondas', '#6C63FF')}
+          />
+          <ConfigRow
+            label="Aviso final"
+            value={formatDuration(config.warning_seconds)}
+            icon="alarm"
+            accent="#19C8D1"
+            onPress={() => openPicker('warning_seconds', 'Aviso final', '#19C8D1')}
+          />
+        </View>
+      )}
 
       <TimerPickerModal picker={picker} config={config} onClose={() => setPicker(null)} onApply={handleApply} />
     </View>

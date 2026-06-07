@@ -697,6 +697,13 @@ Se construyó la aplicación completa desde cero. Archivos creados:
 - [x] `lib/onboarding.ts`: helper central `completePendingOnboarding()` para guardar perfil, desactivar planes previos y guardar el plan activo.
 - [x] Timers guardados siguen aislados por usuario mediante `TimerPreset.userId` y `getPresetsForUser()`.
 
+### 29. Correccion de tab "Mis timers" (Junio 2026)
+- [x] `TimerConfig.tsx`: el selector `Nuevo timer / Mis timers` ahora recibe estado y callbacks desde `timer.tsx`.
+- [x] `timer.tsx`: nueva vista real de `Mis timers` con tarjetas verticales para cargar presets guardados.
+- [x] `timer.tsx`: al guardar un preset se cambia automaticamente a `Mis timers`.
+- [x] `timerStore.ts`: `getPresetsForUser()` inyecta presets del sistema aunque AsyncStorage tenga una version persistida antigua.
+- [x] `timerStore.ts`: presets del sistema no se persisten ni se eliminan desde `deletePreset()`.
+
 ---
 
 *Ultima actualizacion: Junio 2026*

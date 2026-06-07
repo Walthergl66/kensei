@@ -58,9 +58,9 @@ export const useTimerStore = create<TimerState>()(
 
       getPresetsForUser: (userId: string) => {
         const all = get().presets;
-        const system = all.filter((p) => p.userId === '__system__');
-        const user = all.filter((p) => p.userId === userId);
-        return [...system, ...user];
+        const personalPresets = all.filter((p) => p.userId && p.userId !== '__system__');
+        const user = personalPresets.filter((p) => p.userId === userId);
+        return [...SYSTEM_PRESETS, ...user];
       },
 
       setConfig: (partial) =>
@@ -212,6 +212,7 @@ export const useTimerStore = create<TimerState>()(
       },
 
       deletePreset: (id) => {
+        if (id.startsWith('sys-')) return;
         set((state) => ({ presets: state.presets.filter((p) => p.id !== id) }));
       },
 
@@ -228,7 +229,7 @@ export const useTimerStore = create<TimerState>()(
     {
       name: 'kensei-timer-storage',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({ presets: state.presets }),
+      partialize: (state) => ({ presets: state.presets.filter((preset) => preset.userId !== '__system__') }),
     }
   )
 );
