@@ -25,7 +25,7 @@ El nombre "Kensei" proviene del japones y significa guerrero experto o maestro d
 | Base de datos | Supabase (PostgreSQL) |
 | Backend | Supabase (Auth + Database + Storage) |
 | Estilos | NativeWind (Tailwind para React Native) |
-| IA / Agente | Ollama (API local, gratuita) |
+| IA / Agente | Groq (API gratuita, modelos Llama 3 / Mixtral) |
 | SDK Supabase | `@supabase/supabase-js` |
 
 ### Reglas del stack
@@ -34,7 +34,7 @@ El nombre "Kensei" proviene del japones y significa guerrero experto o maestro d
 - No instalar librerias fuera del stack definido sin justificacion explicita en un comentario.
 - Todos los estilos van con NativeWind. No usar `StyleSheet.create` salvo animaciones nativas.
 - Toda interaccion con la base de datos va a traves del cliente de Supabase, nunca con queries directas.
-- El agente de IA usa Ollama. No integrar ninguna API de pago sin confirmacion explicita.
+- El agente de IA usa Groq (API gratuita). No integrar ninguna API de pago sin confirmacion explicita.
 
 ---
 
@@ -63,7 +63,7 @@ kensei/
 │   ├── training/                    # Componentes de sesion y ejercicios
 │   └── onboarding/                  # Componentes del cuestionario
 ├── lib/
-│   ├── agent.ts                     # Logica de llamada a Ollama
+│   ├── agent.ts                     # Logica de llamada a Groq
 │   ├── supabase.ts                  # Cliente y helpers de Supabase
 │   └── utils.ts                     # Funciones utilitarias generales
 ├── stores/
@@ -107,7 +107,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 ```
 EXPO_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key
-OLLAMA_BASE_URL=http://localhost:11434   # URL del servidor Ollama local
+EXPO_PUBLIC_GROQ_API_KEY=tu-api-key   # API key de Groq (console.groq.com/keys)
 ```
 
 ### Esquema de base de datos (SQL para ejecutar en Supabase)
@@ -188,133 +188,53 @@ export async function getActiveTrainingPlan(): Promise<TrainingPlan | null>
 
 ---
 
-## Agente de recomendaciones con Ollama (lib/agent.ts)
+## Agente de recomendaciones con Groq (lib/agent.ts)
 
-Ollama permite correr modelos de lenguaje de forma local y gratuita. Expone una API REST compatible con el formato de OpenAI, por lo que la integracion es simple sin necesidad de SDK adicional.
+Groq es una API gratuita que corre modelos open-source como Llama 3 y Mixtral a alta velocidad. No requiere servidor local, solo una API key de [console.groq.com](https://console.groq.com/). El plan gratuito permite 30 solicitudes por minuto y 6000 por dia.
 
-### Modelo recomendado
-
-Usar `llama3.2` o `mistral` segun lo que el usuario tenga descargado en su instancia de Ollama. El modelo se configura en las variables de entorno o en `constants/index.ts`.
+### Configuracion
 
 ```typescript
 // constants/index.ts
-export const OLLAMA_MODEL = 'llama3.2';       // cambiar segun modelo disponible
-export const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434';
+export const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
+export const GROQ_MODEL = 'llama-3.3-70b-versatile';
+export const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 ```
+
+```bash
+# .env.local
+EXPO_PUBLIC_GROQ_API_KEY=tu-api-key-aqui
+```
+
+La API key se obtiene gratis en https://console.groq.com/keys
 
 ### Implementacion (lib/agent.ts)
 
+El agente usa el endpoint de chat de Groq, compatible con OpenAI. No se necesita SDK adicional, solo `fetch` con autenticacion Bearer.
+
 ```typescript
-// lib/agent.ts
-
-import { OLLAMA_BASE_URL, OLLAMA_MODEL } from '@/constants';
-import { UserProfile, TrainingPlan } from '@/types';
-
-const SYSTEM_PROMPT = `
-Eres Kensei, un entrenador experto en boxeo y MMA con mas de 15 anos de experiencia 
-formando atletas de todos los niveles, desde principiantes absolutos hasta competidores 
-profesionales. Tu rol es generar planes de entrenamiento personalizados, precisos y seguros.
-
-Cuando recibas un perfil de usuario, genera un plan semanal completo en formato JSON 
-con la siguiente estructura exacta:
-
-{
-  "plan_name": "string",
-  "duration_weeks": number,
-  "sessions_per_week": number,
-  "weekly_structure": [
-    {
-      "day": "string",
-      "session_type": "string",
-      "duration_minutes": number,
-      "rounds": number,
-      "round_duration_seconds": number,
-      "rest_seconds": number,
-      "exercises": [
-        {
-          "name": "string",
-          "description": "string",
-          "duration_seconds": number,
-          "sets": number,
-          "reps": number | null
-        }
-      ],
-      "focus": "string",
-      "intensity": "low" | "medium" | "high"
-    }
-  ],
-  "recommendations": ["string"],
-  "warnings": ["string"]
-}
-
-Reglas:
-- Adapta la intensidad, duracion y ejercicios al nivel y condicion fisica del usuario.
-- Si hay lesiones, evita ejercicios que las agraven y mencionalas en warnings.
-- Para principiantes, prioriza tecnica sobre intensidad.
-- Para nivel avanzado, incluye trabajo de sparring y combinaciones complejas.
-- El campo warnings debe incluir avisos de seguridad relevantes al perfil.
-- El campo recommendations debe incluir consejos de alimentacion, descanso y progresion.
-- Responde UNICAMENTE con el JSON. Sin texto adicional, sin explicaciones,
-  sin bloques de codigo markdown, sin caracteres extra antes o despues del JSON.
-`;
-
-export async function generateTrainingPlan(profile: UserProfile): Promise<TrainingPlan> {
-  const userMessage = `
-    Genera un plan de entrenamiento para este usuario:
-    - Nombre: ${profile.name}
-    - Disciplina: ${profile.discipline}
-    - Objetivo: ${profile.goal}
-    - Nivel: ${profile.level}
-    - Dias disponibles por semana: ${profile.days_per_week}
-    - Equipamiento disponible: ${profile.equipment}
-    - Condicion fisica actual: ${profile.fitness_level}
-    - Lesiones o limitaciones: ${profile.injuries ?? 'Ninguna'}
-  `;
-
-  const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+const callGroq = async (systemPrompt: string, userMessage: string): Promise<string> => {
+  const response = await fetch(GROQ_API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${GROQ_API_KEY}`,
+    },
     body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      stream: false,
+      model: GROQ_MODEL,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
     }),
   });
 
-  if (!response.ok) {
-    throw new Error(`Ollama no esta disponible. Verifica que el servidor este corriendo en ${OLLAMA_BASE_URL}`);
-  }
-
   const data = await response.json();
-  const raw: string = data?.message?.content ?? '';
-
-  try {
-    // Limpiar posibles bloques markdown que el modelo incluya de todas formas
-    const clean = raw.replace(/```json|```/g, '').trim();
-    return JSON.parse(clean) as TrainingPlan;
-  } catch {
-    throw new Error('El agente devolvio una respuesta invalida. Intenta de nuevo.');
-  }
-}
+  return data.choices[0].message.content.trim();
+};
 ```
 
-### Requisito para el usuario
-
-Ollama debe estar corriendo localmente en la maquina de desarrollo. Comandos de referencia:
-
-```bash
-# Instalar Ollama desde https://ollama.com
-# Descargar el modelo
-ollama pull llama3.2
-
-# Iniciar el servidor (queda corriendo en localhost:11434)
-ollama serve
-```
-
-Para produccion o distribucion de la app, se debera reemplazar Ollama por un backend propio que exponga el mismo endpoint, o migrar a una API de pago. Este cambio solo requiere actualizar `OLLAMA_BASE_URL`.
+El timeout de las peticiones es de 20 segundos con reintentos automaticos. Si Groq no responde (API key invalida, sin internet, etc), la app cae al plan por defecto sin congelarse.
 
 ---
 
@@ -480,9 +400,9 @@ export const COLORS = {
 2. No crear archivos fuera de la estructura de carpetas definida sin justificacion.
 3. Cada componente debe tener sus tipos definidos en `types/index.ts` o localmente si son exclusivos del componente.
 4. Toda interaccion con Supabase va en `lib/supabase.ts`. No importar el cliente de supabase en componentes o stores directamente.
-5. Las llamadas a Ollama van exclusivamente en `lib/agent.ts`.
-6. Manejar siempre los estados de carga y error en pantallas que llamen al agente o a Supabase.
-7. No integrar ninguna API de IA de pago. El agente usa Ollama.
+5. Las llamadas a Groq van exclusivamente en `lib/agent.ts`.
+
+7. No integrar ninguna API de IA de pago. El agente usa Groq.
 8. Todos los textos visibles al usuario van en espanol.
 9. Al terminar una tarea, indicar que archivos fueron creados o modificados.
 
@@ -513,7 +433,7 @@ export const COLORS = {
 ### 4. Constantes (constants/index.ts)
 - [x] Paleta de colores completa (fondo oscuro, primary dorado)
 - [x] Configuracion por defecto del temporizador
-- [x] Configuracion de Ollama (modelo, base URL)
+- [x] Configuracion de Groq (modelo, API URL)
 
 ### 5. Cliente Supabase + helpers (lib/supabase.ts)
 - [x] Crear cliente Supabase con AsyncStorage para sesion
@@ -542,11 +462,11 @@ export const COLORS = {
 ### 8. Pantallas de onboarding
 - [x] `welcome.tsx`: Pantalla de bienvenida con texto descriptivo
 - [x] `questionnaire.tsx`: Stepper de 7 preguntas
-- [x] Soporte para modo dev (datos mock) y modo real (Supabase + Ollama)
-- [x] Plan por defecto si Ollama falla
+- [x] Soporte para modo dev (datos mock) y modo real (Supabase + Groq)
+- [x] Plan por defecto si Groq falla
 - [x] Campo opcional de lesiones/limitaciones
 
-### 9. Integracion con agente Ollama (lib/agent.ts)
+### 9. Integracion con agente Groq (lib/agent.ts)
 - [x] System prompt con instrucciones para generar plan JSON
 - [x] Funcion `generateTrainingPlan()` con llamada a `{base_url}/api/chat`
 - [x] Limpieza de bloques markdown en respuesta
@@ -572,7 +492,7 @@ export const COLORS = {
 - [x] Vista de plan semanal con todas las sesiones
 - [x] Badge de intensidad (alta/media/baja)
 - [x] Navegacion a detalle de sesion
-- [x] Boton para regenerar plan via Ollama
+- [x] Boton para regenerar plan via Groq
 - [x] Advertencias del plan
 
 ### 13. Vista de sesion activa (training/[sessionId])
@@ -591,7 +511,7 @@ export const COLORS = {
 - [x] Avatar placeholder con iniciales
 - [x] Datos del perfil con iconos
 - [x] Plan activo (o estado vacio)
-- [x] Regenerar plan via Ollama
+- [x] Regenerar plan via Groq
 - [x] Reiniciar onboarding con confirmacion
 - [x] Cerrar sesion (solo en modo real)
 
@@ -650,9 +570,9 @@ export const COLORS = {
 ---
 
 ## Pendiente (requiere accion manual)
-- [ ] **Variables de entorno**: Crear archivo `.env` con `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_OLLAMA_BASE_URL`
+- [ ] **Variables de entorno**: Crear archivo `.env` con `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_GROQ_API_KEY`
 - [ ] **Ejecutar SQL en Supabase**: Crear las tablas `user_profile`, `sessions`, `training_plans` y las políticas RLS
-- [ ] **Probar con Ollama**: Tener Ollama corriendo localmente con `llama3.2` para generar planes
+- [ ] **Obtener API key de Groq**: Ir a https://console.groq.com/keys y generar una API key gratuita
 - [ ] **Probar en dispositivo**: Ejecutar `npx expo start` y probar en Expo Go
 - [ ] **Confirmacion de email**: En Supabase, los usuarios nuevos deben confirmar su email. Se puede desactivar en Authentication > Settings > Disable email confirmation para desarrollo.
 
@@ -727,6 +647,45 @@ Se construyó la aplicación completa desde cero. Archivos creados:
 - [x] **ESTÉTICO**: Barra de progreso horizontal en el StepIndicator (antes dots).
 - [x] **ESTÉTICO**: Transition `fade` entre pantallas en root Stack.
 - [x] **ESTÉTICO**: Todos los ScrollView con `showsVerticalScrollIndicator={false}`.
+
+### 23. Agente como Asistente Virtual (Junio 2026)
+- [x] **FUNCIONAL**: El agente ahora genera planes incluso en modo desarrollo si la API de Gemini está disponible.
+- [x] **FUNCIONAL**: Nuevo sistema de "Consejo del Coach" en la pantalla Home que proporciona tips dinámicos en cada refresh.
+- [x] **FUNCIONAL**: Helper `getCoachAdvice()` en `lib/agent.ts` para interacciones rápidas con la IA.
+- [x] **UX**: Botón de regenerar plan en `training.tsx` ahora muestra errores detallados de conexión con Groq.
+- [x] **CONFIG**: Instrucciones añadidas en `constants/index.ts` para configurar la API key de Groq.
+
+### 24. Migracion de Ollama a Gemini API (Junio 2026)
+- [x] Reemplazar Ollama por Google Gemini 2.0 Flash como proveedor de IA
+- [x] Actualizar `lib/agent.ts` para usar `fetch` directo al endpoint `generateContent` de Gemini
+- [x] Actualizar `constants/index.ts` con configuracion de Gemini (modelo, URL)
+- [x] Actualizar `.env.local` con `EXPO_PUBLIC_GEMINI_API_KEY`
+- [x] Timeout de 15 segundos en peticiones a Gemini
+- [x] Fallback a plan por defecto si Gemini falla (sin congelar la app)
+
+### 25. Migracion de Gemini a Groq API (Junio 2026)
+- [x] Reemplazar Gemini por Groq como proveedor de IA
+- [x] Actualizar `lib/agent.ts` para usar endpoint compatible con OpenAI de Groq
+- [x] Actualizar `constants/index.ts` con configuracion de Groq (modelo, URL)
+- [x] Actualizar `.env.local` con `EXPO_PUBLIC_GROQ_API_KEY`
+- [x] Reintentos con backoff para rate limiting (429)
+- [x] Timeout de 20 segundos en peticiones a Groq
+
+### 26. Timer personalizable con minutos+segundos y presets por usuario (Junio 2026)
+- [x] `TimerConfig.tsx`: DualConfigItem con minutos y segundos separados para duracion y descanso
+- [x] Control fino: minutos en pasos de 1, segundos en pasos de 5
+- [x] Configuracion de aviso (warning_seconds) visible en UI
+- [x] `timerStore.ts`: TimerPreset ahora incluye `userId` para aislamiento por usuario
+- [x] `getPresetsForUser()`: filtra presets del usuario actual + presets del sistema
+- [x] Presets del sistema (Boxeo Pro, MMA, Tabata) visibles para todos
+- [x] `timer.tsx`: boton "+ GUARDAR ACTUAL" asocia preset al usuario logueado
+
+### 27. Timer tipo intervalos con selector de rueda (Junio 2026)
+- [x] `TimerConfig.tsx`: configuracion migrada de botones +/- a filas pulsables estilo interval timer.
+- [x] Selector full-screen tipo rueda para trabajo, descanso, rondas y aviso final.
+- [x] `timer.tsx`: pantalla idle reorganizada con header, presets, filas de configuracion y tarjeta grande de inicio con total configurado.
+- [x] `timer.tsx`: boton de guardado rapido de preset desde header y desde tarjeta de inicio.
+- [x] `lib/notifications.ts`: stub `scheduleDailyReminder()` tipado con hora/minuto para mantener TypeScript limpio.
 
 ---
 

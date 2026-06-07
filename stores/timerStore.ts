@@ -8,6 +8,7 @@ export interface TimerPreset {
   id: string;
   name: string;
   config: TimerConfig;
+  userId: string;
 }
 
 interface TimerState {
@@ -27,14 +28,21 @@ interface TimerState {
   pauseTimer: () => void;
   resumeTimer: () => void;
   startFromSession: (config: TimerConfig, sessionName: string) => void;
-  savePreset: (name: string) => void;
+  savePreset: (name: string, userId: string) => void;
   deletePreset: (id: string) => void;
   loadPreset: (preset: TimerPreset) => void;
+  getPresetsForUser: (userId: string) => TimerPreset[];
 }
 
 function calculateTotalTime(config: TimerConfig): number {
   return config.rounds * config.round_duration + (config.rounds - 1) * config.rest_duration;
 }
+
+const SYSTEM_PRESETS: TimerPreset[] = [
+  { id: 'sys-1', name: 'Boxeo Pro', config: { rounds: 12, round_duration: 180, rest_duration: 60, warning_seconds: 10 }, userId: '__system__' },
+  { id: 'sys-2', name: 'MMA', config: { rounds: 5, round_duration: 300, rest_duration: 60, warning_seconds: 10 }, userId: '__system__' },
+  { id: 'sys-3', name: 'Tabata', config: { rounds: 8, round_duration: 20, rest_duration: 10, warning_seconds: 5 }, userId: '__system__' },
+];
 
 export const useTimerStore = create<TimerState>()(
   persist(
@@ -46,11 +54,14 @@ export const useTimerStore = create<TimerState>()(
       totalTimeLeft: calculateTotalTime(DEFAULT_TIMER),
       sessionSource: null,
       pausedAt: null,
-      presets: [
-        { id: '1', name: 'Boxeo Pro', config: { rounds: 12, round_duration: 180, rest_duration: 60, warning_seconds: 10 } },
-        { id: '2', name: 'MMA', config: { rounds: 5, round_duration: 300, rest_duration: 60, warning_seconds: 10 } },
-        { id: '3', name: 'Tabata', config: { rounds: 8, round_duration: 20, rest_duration: 10, warning_seconds: 5 } },
-      ],
+      presets: [...SYSTEM_PRESETS],
+
+      getPresetsForUser: (userId: string) => {
+        const all = get().presets;
+        const system = all.filter((p) => p.userId === '__system__');
+        const user = all.filter((p) => p.userId === userId);
+        return [...system, ...user];
+      },
 
       setConfig: (partial) =>
         set((state) => {
@@ -68,8 +79,6 @@ export const useTimerStore = create<TimerState>()(
           totalTimeLeft: calculateTotalTime(config),
           pausedAt: null,
         });
-        // Sound: Start Session
-        import('@/lib/notifications').then(({ soundManager }) => soundManager.play('finish'));
       },
 
       stopTimer: () => set({ status: 'idle', sessionSource: null, pausedAt: null }),
@@ -136,50 +145,39 @@ export const useTimerStore = create<TimerState>()(
 
         const newTimeLeft = timeLeft - 1;
 
-        // --- Sound Logic ---
         const isWork = status === 'running' || status === 'warning';
         const duration = isWork ? config.round_duration : config.rest_duration;
         const halfway = Math.floor(duration / 2);
 
-        // Sound: Halfway (Only for Work)
         if (isWork && newTimeLeft === halfway) {
           import('@/lib/notifications').then(({ soundManager }) => soundManager.play('halfway'));
-        } 
-        
-        // Sound: Warning Beeps (Last 3 seconds of any phase)
+        }
         if (newTimeLeft <= 3 && newTimeLeft > 0) {
           import('@/lib/notifications').then(({ soundManager }) => soundManager.play('beep'));
-        } 
-        
-        // Sound: Phase Finish
+        }
         if (newTimeLeft === 0) {
           import('@/lib/notifications').then(({ soundManager }) => soundManager.play('finish'));
         }
-        // --- End Sound Logic ---
 
         if (newTimeLeft <= 0) {
           if (isWork) {
             if (currentRound < config.rounds) {
-              // Transition to Rest
               set({
                 status: 'resting',
                 timeLeft: config.rest_duration,
                 totalTimeLeft: get().totalTimeLeft - 1,
               });
-              // Sound: Start of Rest
               import('@/lib/notifications').then(({ soundManager }) => soundManager.play('finish'));
             } else {
               set({ status: 'finished', timeLeft: 0, totalTimeLeft: 0 });
             }
           } else if (status === 'resting') {
-            // Transition to Work
             set({
               status: 'running',
               currentRound: currentRound + 1,
               timeLeft: config.round_duration,
               totalTimeLeft: get().totalTimeLeft - 1,
             });
-            // Sound: Start of Round
             import('@/lib/notifications').then(({ soundManager }) => soundManager.play('finish'));
           }
         } else {
@@ -203,11 +201,12 @@ export const useTimerStore = create<TimerState>()(
           pausedAt: null,
         }),
 
-      savePreset: (name) => {
+      savePreset: (name, userId) => {
         const newPreset: TimerPreset = {
           id: Date.now().toString(),
           name,
           config: { ...get().config },
+          userId,
         };
         set((state) => ({ presets: [...state.presets, newPreset] }));
       },

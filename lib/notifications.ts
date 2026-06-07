@@ -19,5 +19,5 @@ export const soundManager = new SoundManager();
 
 // Notification stubs
 export async function registerForPushNotificationsAsync() { return false; }
-export async function scheduleDailyReminder() { }
+export async function scheduleDailyReminder(_hour: number, _minute: number) { }
 export async function cancelAllReminders() { }
