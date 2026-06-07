@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { Animated, FlatList, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { TimerConfig as TimerConfigType } from '@/types';
@@ -66,97 +66,161 @@ function splitTime(totalSeconds: number) {
 }
 
 function ConfigRow({ label, value, icon, accent, onPress }: ConfigRowProps) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.97,
+      useNativeDriver: true,
+      damping: 15,
+      stiffness: 200,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      damping: 12,
+      stiffness: 180,
+    }).start();
+  };
+
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.82}
-      className="bg-[#141414] rounded-2xl px-5 py-4 border border-[#242424] flex-row items-center justify-between"
-      style={{ shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 4 }}
-    >
-      <View className="flex-row items-center flex-1 pr-4">
-        <View className="w-11 h-11 rounded-full items-center justify-center mr-4 border" style={{ borderColor: accent, backgroundColor: `${accent}14` }}>
-          <Ionicons name={icon} size={24} color={accent} />
+    <Animated.View style={[{ transform: [{ scale: scaleAnim }] }]}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={0.92}
+        className="bg-[#141414] rounded-2xl px-5 py-4 border border-[#1E1E1E] flex-row items-center justify-between"
+        style={{ shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 4 }}
+      >
+        <View className="flex-row items-center flex-1 pr-4">
+          <View className="w-11 h-11 rounded-full items-center justify-center mr-4 border" style={{ borderColor: accent, backgroundColor: `${accent}14` }}>
+            <Ionicons name={icon} size={24} color={accent} />
+          </View>
+          <Text className="text-xl font-extrabold tracking-tight flex-1" style={{ color: accent }}>
+            {label}
+          </Text>
         </View>
-        <Text className="text-xl font-extrabold tracking-tight flex-1" style={{ color: accent }}>
-          {label}
-        </Text>
-      </View>
-      <View className="flex-row items-center">
-        <Text className="text-2xl font-black font-mono" style={{ color: accent }}>
-          {value}
-        </Text>
-        <Ionicons name="chevron-forward" size={18} color="#666666" style={{ marginLeft: 8 }} />
-      </View>
-    </TouchableOpacity>
+        <View className="flex-row items-center">
+          <Text className="text-2xl font-black font-mono" style={{ color: accent }}>
+            {value}
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color="#666666" style={{ marginLeft: 8 }} />
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
-function WheelColumn({ values, selected, label, accent, formatter, onSelect }: {
+function WheelColumn({ values, selected, label, formatter, onSelect }: {
   values: number[];
   selected: number;
   label: string;
-  accent: string;
   formatter?: (value: number) => string;
   onSelect: (value: number) => void;
 }) {
-  const listRef = useRef<FlatList<number>>(null);
+  const listRef = useRef<Animated.FlatList<number>>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
   const selectedIndex = Math.max(0, values.indexOf(selected));
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      listRef.current?.scrollToIndex({ index: selectedIndex, animated: false });
-    }, 50);
+      listRef.current?.scrollToIndex({ index: selectedIndex, animated: true });
+    }, 300);
     return () => clearTimeout(timeout);
   }, [selectedIndex]);
 
-  const handleMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const handleMomentumEnd = (event: { nativeEvent: { contentOffset: { y: number } } }) => {
     const nextIndex = clamp(Math.round(event.nativeEvent.contentOffset.y / ITEM_HEIGHT), 0, values.length - 1);
     onSelect(values[nextIndex]);
   };
 
+  const renderItem = useCallback(({ item, index }: { item: number; index: number }) => {
+    const itemCenter = index * ITEM_HEIGHT;
+
+    const inputRange = [
+      itemCenter - 3 * ITEM_HEIGHT,
+      itemCenter - 2 * ITEM_HEIGHT,
+      itemCenter - ITEM_HEIGHT,
+      itemCenter,
+      itemCenter + ITEM_HEIGHT,
+      itemCenter + 2 * ITEM_HEIGHT,
+      itemCenter + 3 * ITEM_HEIGHT,
+    ];
+
+    const scale = scrollY.interpolate({
+      inputRange,
+      outputRange: [0.55, 0.65, 0.82, 1, 0.82, 0.65, 0.55],
+      extrapolate: 'clamp',
+    });
+
+    const opacity = scrollY.interpolate({
+      inputRange,
+      outputRange: [0.1, 0.2, 0.45, 1, 0.45, 0.2, 0.1],
+      extrapolate: 'clamp',
+    });
+
+    const isSelected = item === selected;
+
+    return (
+      <TouchableOpacity
+        onPress={() => {
+          onSelect(item);
+          listRef.current?.scrollToIndex({ index: values.indexOf(item), animated: true });
+        }}
+        activeOpacity={0.8}
+        style={{ height: ITEM_HEIGHT }}
+        className="items-center justify-center"
+      >
+        <Animated.View style={[{ transform: [{ scale }], opacity }]}>
+          <Text
+            className={`${isSelected ? 'text-3xl font-black' : 'text-xl font-bold'} tracking-tight`}
+            style={{ color: isSelected ? '#FFFFFF' : 'rgba(255,255,255,0.32)' }}
+          >
+            {formatter ? formatter(item) : item}
+          </Text>
+        </Animated.View>
+      </TouchableOpacity>
+    );
+  }, [selected, formatter, onSelect, scrollY]);
+
   return (
     <View className="flex-1 items-center">
       <View style={{ height: ITEM_HEIGHT * VISIBLE_ITEMS }} className="w-full overflow-hidden">
-        <FlatList
+        <Animated.FlatList
           ref={listRef}
           data={values}
           keyExtractor={(item) => `${label}-${item}`}
           showsVerticalScrollIndicator={false}
           snapToInterval={ITEM_HEIGHT}
-          decelerationRate="fast"
+          decelerationRate="normal"
           initialScrollIndex={selectedIndex}
           getItemLayout={(_, index) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
           contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: true },
+          )}
+          scrollEventThrottle={16}
+          renderItem={renderItem}
           onMomentumScrollEnd={handleMomentumEnd}
-          renderItem={({ item }) => {
-            const isSelected = item === selected;
-            return (
-              <TouchableOpacity
-                onPress={() => {
-                  onSelect(item);
-                  listRef.current?.scrollToIndex({ index: values.indexOf(item), animated: true });
-                }}
-                activeOpacity={0.85}
-                style={{ height: ITEM_HEIGHT }}
-                className="items-center justify-center"
-              >
-                <Text
-                  className={`${isSelected ? 'text-3xl font-black' : 'text-xl font-bold'} tracking-tight`}
-                  style={{ color: isSelected ? '#FFFFFF' : 'rgba(255,255,255,0.32)' }}
-                >
-                  {formatter ? formatter(item) : item}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
         />
         <View
           pointerEvents="none"
-          className="absolute left-0 right-0 rounded-full border border-white/10"
-          style={{ top: ITEM_HEIGHT * 2, height: ITEM_HEIGHT, backgroundColor: 'rgba(0,0,0,0.12)' }}
+          className="absolute left-1 right-1 rounded-xl"
+          style={{
+            top: ITEM_HEIGHT * 2,
+            height: ITEM_HEIGHT,
+            backgroundColor: 'rgba(255,255,255,0.06)',
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.10)',
+          }}
         />
       </View>
-      <Text className="text-white/80 text-base font-bold mt-1">
+      <Text className="text-white/70 text-sm font-bold mt-2 uppercase tracking-wider">
         {label}
       </Text>
     </View>
@@ -197,7 +261,6 @@ function TimerPickerModal({ picker, config, onClose, onApply }: {
 
   const isRoundPicker = picker.target === 'rounds';
   const isWarningPicker = picker.target === 'warning_seconds';
-  const secondsOptions = secondValues;
 
   const handleApply = () => {
     if (picker.target === 'rounds') {
@@ -245,14 +308,14 @@ function TimerPickerModal({ picker, config, onClose, onApply }: {
 
             <View className="flex-row items-center rounded-[32px] px-2 py-5" style={{ backgroundColor: 'rgba(0,0,0,0.08)' }}>
               {isRoundPicker ? (
-                <WheelColumn values={roundValues} selected={rounds} label="rondas" accent={picker.accent} onSelect={setRounds} />
+                <WheelColumn values={roundValues} selected={rounds} label="rondas" onSelect={setRounds} />
               ) : isWarningPicker ? (
-                <WheelColumn values={warningValues} selected={warningSeconds} label="seg" accent={picker.accent} onSelect={setWarningSeconds} />
+                <WheelColumn values={warningValues} selected={warningSeconds} label="seg" onSelect={setWarningSeconds} />
               ) : (
                 <>
-                  <WheelColumn values={hourValues} selected={hours} label="horas" accent={picker.accent} onSelect={setHours} />
-                  <WheelColumn values={minuteValues} selected={minutes} label="min" accent={picker.accent} onSelect={setMinutes} />
-                  <WheelColumn values={secondsOptions} selected={secondsOptions.includes(seconds) ? seconds : 0} label="s" accent={picker.accent} onSelect={setSeconds} />
+                  <WheelColumn values={hourValues} selected={hours} label="horas" onSelect={setHours} />
+                  <WheelColumn values={minuteValues} selected={minutes} label="min" onSelect={setMinutes} />
+                  <WheelColumn values={secondValues} selected={secondValues.includes(seconds) ? seconds : 0} label="seg" onSelect={setSeconds} />
                 </>
               )}
             </View>
@@ -273,8 +336,8 @@ export default function TimerConfig({ config, onChange, disabled, activeTab, onT
   };
 
   const handleApply = (nextConfig: Partial<TimerConfigType>) => {
-    onChange(nextConfig);
     setPicker(null);
+    onChange(nextConfig);
   };
 
   return (
