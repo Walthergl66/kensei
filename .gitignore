@@ -5,7 +5,7 @@ node_modules/
 .opencode/
 # sql
 doc/
-
+.env*
 # Expo
 .expo/
 dist/
@@ -34,6 +34,7 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # typescript
