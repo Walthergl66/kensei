@@ -25,7 +25,7 @@ El nombre "Kensei" proviene del japones y significa guerrero experto o maestro d
 | Base de datos | Supabase (PostgreSQL) |
 | Backend | Supabase (Auth + Database + Storage) |
 | Estilos | NativeWind (Tailwind para React Native) |
-| IA / Agente | Groq (API gratuita, modelos Llama 3 / Mixtral) |
+| IA / Agente | Groq o Gemini (API gratuitas, intercambiables via `.env`) |
 | SDK Supabase | `@supabase/supabase-js` |
 
 ### Reglas del stack
@@ -34,7 +34,7 @@ El nombre "Kensei" proviene del japones y significa guerrero experto o maestro d
 - No instalar librerias fuera del stack definido sin justificacion explicita en un comentario.
 - Todos los estilos van con NativeWind. No usar `StyleSheet.create` salvo animaciones nativas.
 - Toda interaccion con la base de datos va a traves del cliente de Supabase, nunca con queries directas.
-- El agente de IA usa Groq (API gratuita). No integrar ninguna API de pago sin confirmacion explicita.
+- El agente de IA usa Groq o Gemini (APIs gratuitas, elegidas segun `.env`). No integrar ninguna API de pago sin confirmacion explicita.
 
 ---
 
@@ -63,7 +63,7 @@ kensei/
 │   ├── training/                    # Componentes de sesion y ejercicios
 │   └── onboarding/                  # Componentes del cuestionario
 ├── lib/
-│   ├── agent.ts                     # Logica de llamada a Groq
+│   ├── agent.ts                     # Logica de llamada a Groq/Gemini
 │   ├── supabase.ts                  # Cliente y helpers de Supabase
 │   └── utils.ts                     # Funciones utilitarias generales
 ├── stores/
@@ -188,9 +188,15 @@ export async function getActiveTrainingPlan(): Promise<TrainingPlan | null>
 
 ---
 
-## Agente de recomendaciones con Groq (lib/agent.ts)
+## Agente de recomendaciones (lib/agent.ts) — Groq o Gemini
 
-Groq es una API gratuita que corre modelos open-source como Llama 3 y Mixtral a alta velocidad. No requiere servidor local, solo una API key de [console.groq.com](https://console.groq.com/). El plan gratuito permite 30 solicitudes por minuto y 6000 por dia.
+Kensei soporta dos proveedores de IA gratuitos e intercambiables. Se elige en tiempo de ejecucion segun las variables de entorno (`.env`):
+
+- Si existe `EXPO_PUBLIC_GROQ_API_KEY`, usa **Groq** (`llama-3.3-70b-versatile`, endpoint compatible con OpenAI, lista en [console.groq.com](https://console.groq.com/)).
+- Si no hay Groq pero existe `EXPO_PUBLIC_GEMINI_API_KEY`, usa **Gemini 2.0 Flash** (`generateContent`, key en [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)).
+- Si ninguna esta configurada, `getActiveProvider()` lanza un error claro y la app cae al `DEFAULT_PLAN` sin congelarse.
+
+Ambos llamados comparten timeout de 20 segundos y reintentos con backoff ante rate limit (429/503).
 
 ### Configuracion
 
@@ -199,6 +205,10 @@ Groq es una API gratuita que corre modelos open-source como Llama 3 y Mixtral a 
 export const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
 export const GROQ_MODEL = 'llama-3.3-70b-versatile';
 export const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+export const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
+export const GEMINI_MODEL = 'gemini-2.0-flash';
+export const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 ```
 
 ```bash
@@ -210,7 +220,7 @@ La API key se obtiene gratis en https://console.groq.com/keys
 
 ### Implementacion (lib/agent.ts)
 
-El agente usa el endpoint de chat de Groq, compatible con OpenAI. No se necesita SDK adicional, solo `fetch` con autenticacion Bearer.
+`callLLMWithRetry()` elige el proveedor activo con `getActiveProvider()` y delega en `callGroq()` (endpoint compatible con OpenAI, autenticacion Bearer) o `callGemini()` (endpoint `generateContent`). Ambos con `fetch` directo, sin SDK extra.
 
 ```typescript
 const callGroq = async (systemPrompt: string, userMessage: string): Promise<string> => {
@@ -234,7 +244,7 @@ const callGroq = async (systemPrompt: string, userMessage: string): Promise<stri
 };
 ```
 
-El timeout de las peticiones es de 20 segundos con reintentos automaticos. Si Groq no responde (API key invalida, sin internet, etc), la app cae al plan por defecto sin congelarse.
+El timeout de las peticiones es de 20 segundos con reintentos automaticos (429/503 con backoff). Si el proveedor no responde (API key invalida, sin internet, etc), la app cae al plan por defecto sin congelarse.
 
 ---
 
@@ -400,9 +410,9 @@ export const COLORS = {
 2. No crear archivos fuera de la estructura de carpetas definida sin justificacion.
 3. Cada componente debe tener sus tipos definidos en `types/index.ts` o localmente si son exclusivos del componente.
 4. Toda interaccion con Supabase va en `lib/supabase.ts`. No importar el cliente de supabase en componentes o stores directamente.
-5. Las llamadas a Groq van exclusivamente en `lib/agent.ts`.
+5. Las llamadas al agente de IA van exclusivamente en `lib/agent.ts`. No importar constantes de API en componentes o stores directamente.
 
-7. No integrar ninguna API de IA de pago. El agente usa Groq.
+7. No integrar ninguna API de IA de pago. El agente usa Groq o Gemini.
 8. Todos los textos visibles al usuario van en espanol.
 9. Al terminar una tarea, indicar que archivos fueron creados o modificados.
 
