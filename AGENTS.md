@@ -704,7 +704,17 @@ Se construyó la aplicación completa desde cero. Archivos creados:
 - [x] `timerStore.ts`: `getPresetsForUser()` inyecta presets del sistema aunque AsyncStorage tenga una version persistida antigua.
 - [x] `timerStore.ts`: presets del sistema no se persisten ni se eliminan desde `deletePreset()`.
 
+### 30. Soporto dual de IA: Groq o Gemini (Septiembre 2026)
+- [x] `lib/agent.ts`: soporta dos proveedores de IA intercambiables segun las variables de entorno.
+- [x] `getActiveProvider()`: si `EXPO_PUBLIC_GROQ_API_KEY` esta presente usa Groq; si no y esta `EXPO_PUBLIC_GEMINI_API_KEY`, usa Gemini; si ninguna, tira error claro y la app cae a DEFAULT_PLAN.
+- [x] `callGemini()`: llamada a `generateContent` de Gemini 2.0 Flash con el mismo timeout/retry de Groq.
+- [x] Reintentos con backoff compartidos: el chequeo `isRetryableStatus()` detecta 429/503 de ambos proveedores.
+- [x] Validacion minima de la respuesta del LLM en `generateTrainingPlan()`: si falta `weekly_structure` o viene vacia, se rechaza y se usa el plan por defecto (antes se confiaba a ciegas en el JSON).
+- [x] `constants/index.ts`: anade `GEMINI_API_KEY`, `GEMINI_MODEL` y `GEMINI_API_URL`.
+- [x] `.env`: variables `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_GROQ_API_KEY`, `EXPO_PUBLIC_GEMINI_API_KEY`.
+- [x] `.gitignore`: ahora ignora el archivo plano `.env` (antes solo `.env*.local`), evitando filtrar claves.
+
 ---
 
-*Ultima actualizacion: Junio 2026*
+*Ultima actualizacion: Septiembre 2026*
 *Proyecto: Kensei — App de artes marciales*
