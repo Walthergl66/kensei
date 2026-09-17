@@ -1,8 +1,10 @@
-import { GROQ_API_KEY, GROQ_MODEL, GROQ_API_URL } from '@/constants';
+import { GROQ_API_KEY, GROQ_MODEL, GROQ_API_URL, GEMINI_API_KEY, GEMINI_MODEL, GEMINI_API_URL } from '@/constants';
 import { UserProfile, TrainingPlan } from '@/types';
 
 const TIMEOUT_MS = 20000;
 const MAX_RETRIES = 3;
+
+type Provider = 'groq' | 'gemini';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -12,11 +14,16 @@ const fetchWithTimeout = (url: string, options: RequestInit, timeout: number = T
   return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(id));
 };
 
-const callGroq = async (systemPrompt: string, userMessage: string): Promise<string> => {
-  if (!GROQ_API_KEY) {
-    throw new Error('API key de Groq no configurada. Agrega EXPO_PUBLIC_GROQ_API_KEY en .env.local');
-  }
+const getActiveProvider = (): Provider | null => {
+  if (GROQ_API_KEY) return 'groq';
+  if (GEMINI_API_KEY) return 'gemini';
+  return null;
+};
 
+const isRetryableStatus = (message: string): boolean =>
+  message.includes('(429') || message.includes('(503') || message.includes('429') || message.includes('503');
+
+const callGroq = async (systemPrompt: string, userMessage: string): Promise<string> => {
   const response = await fetchWithTimeout(GROQ_API_URL, {
     method: 'POST',
     headers: {
@@ -47,19 +54,62 @@ const callGroq = async (systemPrompt: string, userMessage: string): Promise<stri
   return text.trim();
 };
 
-const callGroqWithRetry = async (systemPrompt: string, userMessage: string): Promise<string> => {
+const callGemini = async (systemPrompt: string, userMessage: string): Promise<string> => {
+  const response = await fetchWithTimeout(
+    `${GEMINI_API_URL}/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: `${systemPrompt}\n\n${userMessage}` }],
+          },
+        ],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw new Error(`Gemini API error (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  if (!text) {
+    throw new Error('Gemini devolvio una respuesta vacia');
+  }
+
+  return text.trim();
+};
+
+const callLLM = async (systemPrompt: string, userMessage: string, provider: Provider): Promise<string> => {
+  if (provider === 'groq') return callGroq(systemPrompt, userMessage);
+  return callGemini(systemPrompt, userMessage);
+};
+
+const callLLMWithRetry = async (systemPrompt: string, userMessage: string): Promise<string> => {
+  const provider = getActiveProvider();
+  if (!provider) {
+    throw new Error('No hay API de IA configurada. Agrega EXPO_PUBLIC_GROQ_API_KEY o EXPO_PUBLIC_GEMINI_API_KEY en el .env');
+  }
+
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      return await callGroq(systemPrompt, userMessage);
+      return await callLLM(systemPrompt, userMessage, provider);
     } catch (error: any) {
       lastError = error;
 
-      if (error.message?.includes('(429') || error.message?.includes('(503')) {
+      if (isRetryableStatus(error?.message || '')) {
         if (attempt < MAX_RETRIES) {
           const delay = 1000 * Math.pow(2, attempt);
-          console.warn(`Groq rate limited, retrying in ${delay}ms (attempt ${attempt}/${MAX_RETRIES})`);
+          console.warn(`${provider} rate limited, retrying in ${delay}ms (attempt ${attempt}/${MAX_RETRIES})`);
           await sleep(delay);
           continue;
         }
@@ -69,7 +119,7 @@ const callGroqWithRetry = async (systemPrompt: string, userMessage: string): Pro
     }
   }
 
-  throw lastError || new Error('Groq call failed after retries');
+  throw lastError || new Error('LLM call failed after retries');
 };
 
 const getSystemPrompt = (profile: UserProfile) => `
@@ -125,7 +175,7 @@ export async function getCoachAdvice(profile: UserProfile): Promise<string> {
   const userMessage = `Perfil: ${profile.discipline}, nivel ${profile.level}, objetivo ${profile.goal}.`;
 
   try {
-    return await callGroqWithRetry(systemPrompt, userMessage);
+    return await callLLMWithRetry(systemPrompt, userMessage);
   } catch (error) {
     console.warn('Advice failed:', error);
     return 'Domina lo básico antes de buscar lo complejo. ¡A entrenar!';
@@ -145,12 +195,17 @@ export async function generateTrainingPlan(profile: UserProfile): Promise<Traini
     - Lesiones o limitaciones: ${profile.injuries ?? 'Ninguna'}
   `;
 
-  const raw = await callGroqWithRetry(getSystemPrompt(profile), userMessage);
+  const raw = await callLLMWithRetry(getSystemPrompt(profile), userMessage);
 
   try {
     const clean = raw.replace(/```json|```/g, '').trim();
-    return JSON.parse(clean) as TrainingPlan;
+    if (!clean) throw new Error('Respuesta vacia');
+    const parsed = JSON.parse(clean) as TrainingPlan;
+    if (!parsed.weekly_structure || !Array.isArray(parsed.weekly_structure) || parsed.weekly_structure.length === 0) {
+      throw new Error('Estructura invalida');
+    }
+    return parsed;
   } catch {
-    throw new Error('Groq devolvio una respuesta invalida. Intenta de nuevo.');
+    throw new Error('La IA devolvio una respuesta invalida. Intenta de nuevo.');
   }
 }

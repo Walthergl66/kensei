@@ -23,6 +23,10 @@ export const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '';
 export const GROQ_MODEL = 'llama-3.3-70b-versatile';
 export const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
+export const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
+export const GEMINI_MODEL = 'gemini-2.0-flash';
+export const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+
 import { TrainingPlan } from '@/types';
 
 export const DAYS_OF_WEEK = [
