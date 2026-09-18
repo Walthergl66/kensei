@@ -36,6 +36,8 @@ const callGroq = async (systemPrompt: string, userMessage: string): Promise<stri
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
+      max_tokens: 8192,
+      temperature: 0.7,
     }),
   });
 
@@ -252,7 +254,7 @@ function sanitizeTrainingPlan(raw: unknown, profile: UserProfile): TrainingPlan 
   };
 }
 
-export async function generateTrainingPlan(profile: UserProfile): Promise<TrainingPlan> {
+export async function generateTrainingPlan(profile: UserProfile, extraContext?: string): Promise<TrainingPlan> {
   const userMessage = `
     Genera un plan de entrenamiento para este usuario:
     - Nombre: ${profile.name}
@@ -263,19 +265,57 @@ export async function generateTrainingPlan(profile: UserProfile): Promise<Traini
     - Equipamiento disponible: ${profile.equipment}
     - Condicion fisica actual: ${profile.fitness_level}
     - Lesiones o limitaciones: ${profile.injuries ?? 'Ninguna'}
+    ${extraContext ? `- Preferencias del cuestionario: ${extraContext}` : ''}
   `;
 
   const raw = await callLLMWithRetry(getSystemPrompt(profile), userMessage);
+  const parsed = parsePlanJson(raw);
+
+  if (parsed === null) {
+    console.warn('Plan JSON invalido o truncado, reintentando con instruccion reforzada');
+    const retryRaw = await callLLMWithRetry(
+      getSystemPrompt(profile),
+      `${userMessage}\n\nIMPORTANTE: Devuelve SOLO un JSON valido y COMPLETO. No lo trunques ni agregues texto fuera del JSON.`
+    );
+    const retryParsed = parsePlanJson(retryRaw);
+    if (retryParsed !== null) {
+      return sanitizeTrainingPlan(retryParsed, profile);
+    }
+    throw new Error('La IA devolvio una respuesta invalida o incompleta. Intenta de nuevo.');
+  }
+
+  return sanitizeTrainingPlan(parsed, profile);
+}
+
+function closeBalanced(value: string): string {
+  let fixed = value.replace(/,(\s*[}\]])\s*$/, '$1');
+  while ((fixed.match(/[\{\[]/g) || []).length > (fixed.match(/[\}\]]/g) || []).length) {
+    fixed += '}';
+  }
+  return fixed;
+}
+
+function parsePlanJson(raw: string): unknown | null {
+  const clean = raw
+    .replace(/```json|```/g, '')
+    .trim();
+  if (!clean) return null;
 
   try {
-    const clean = raw.replace(/```json|```/g, '').trim();
-    if (!clean) throw new Error('Respuesta vacia');
-    const parsed = JSON.parse(clean) as unknown;
-    return sanitizeTrainingPlan(parsed, profile);
-  } catch (error) {
-    if (error instanceof Error && error.message !== 'La IA devolvio una respuesta invalida. Intenta de nuevo.') {
-      throw error;
-    }
-    throw new Error('La IA devolvio una respuesta invalida. Intenta de nuevo.');
+    return JSON.parse(clean) as unknown;
+  } catch {
+    // Intento reparar un JSON truncado a mitad de cadena o sin cerrar llaves.
   }
+
+  const candidates = [clean, clean + '"', closeBalanced(clean), closeBalanced(clean + '"')];
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate) as unknown;
+    } catch {
+      // Probar siguiente candidato.
+    }
+  }
+
+  return null;
 }
