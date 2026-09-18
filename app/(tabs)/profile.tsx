@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, Alert, TouchableOpacity, Switch } from 'react-native';
+import { useState } from 'react';
+import { View, Text, ScrollView, Alert, TouchableOpacity, Switch, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,15 +33,25 @@ const levelLabels: Record<string, string> = {
 export default function ProfileScreen() {
   const { profile, isDevMode, remindersEnabled, reminderTime, setReminders, signOut, setProfile, setIsOnboarded } = useUserStore();
   const { plan, clearPlan } = useTrainingStore();
+  const [reminderError, setReminderError] = useState<string | null>(null);
 
   async function toggleReminders(value: boolean) {
     if (value) {
+      setReminderError(null);
       const granted = await registerForPushNotificationsAsync();
       if (!granted) {
-        Alert.alert('Permiso denegado', 'No pudimos activar las notificaciones. Por favor, revísalo en los ajustes de tu teléfono.');
+        const message = Platform.OS === 'web'
+          ? 'Las notificaciones de recordatorio no estan disponibles en la web. Usa la app en tu telefono.'
+          : 'Permiso denegado. No pudimos activar las notificaciones. Revisa los ajustes de tu telefono.';
+        setReminderError(message);
+        Alert.alert('Permiso denegado', message);
         return;
       }
-      await scheduleDailyReminder(reminderTime.hour, reminderTime.minute);
+      const scheduled = await scheduleDailyReminder(reminderTime.hour, reminderTime.minute);
+      if (!scheduled) {
+        setReminderError('No se pudo programar el recordatorio. Intenta de nuevo.');
+        return;
+      }
       setReminders(true);
     } else {
       await cancelAllReminders();
@@ -165,6 +176,12 @@ export default function ProfileScreen() {
                 thumbColor={remindersEnabled ? '#0A0A0A' : '#888888'}
               />
             </View>
+
+            {reminderError && (
+              <View className="bg-[#F44336]/10 border border-[#F44336]/40 rounded-2xl p-3 mb-4">
+                <Text className="text-[#F44336] text-xs">{reminderError}</Text>
+              </View>
+            )}
             
             {remindersEnabled && (
               <View>
