@@ -724,6 +724,14 @@ Se construyó la aplicación completa desde cero. Archivos creados:
 - [x] `.env`: variables `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_GROQ_API_KEY`, `EXPO_PUBLIC_GEMINI_API_KEY`.
 - [x] `.gitignore`: ahora ignora el archivo plano `.env` (antes solo `.env*.local`), evitando filtrar claves.
 
+### 31. Downgrade a Expo SDK 54 (Septiembre 2026)
+- [x] `package.json`: `expo` de `~55.0.26` a `~54.0.37`.
+- [x] Dependencias alineadas al SDK 54 via `npx expo install --fix`: `react@19.1.0`, `react-dom@19.1.0`, `react-native@0.81.5`, `expo-router@~6.0.24`, `babel-preset-expo@~54.0.10`, `expo-linking@~8.0.12`, `react-native-reanimated@~4.1.1`, `react-native-gesture-handler@~2.28.0`, `react-native-screens@~4.16.0`.
+- [x] Instalacion limpia (`rm -rf node_modules package-lock.json`) para resolver conflicto de peer deps con `react-server-dom-webpack` de SDK 55.
+- [x] Peer deps faltantes instaladas: `expo-font`, `expo-constants`, `react-native-worklets` (detectadas por `expo-doctor`).
+- [x] `expo-doctor`: 18/18 checks pasados. `expo router` instalado tambien con su config plugin (`expo-font`).
+- [x] Verificado: `tsc --noEmit` sin errores y bundle Android de produccion compila (4.8MB).
+
 ---
 
 *Ultima actualizacion: Septiembre 2026*
