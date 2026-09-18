@@ -25,20 +25,23 @@ export default function LoginScreen() {
 
     setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    if (!error && data.session?.user && pendingOnboarding) {
-      try {
-        const completedProfile = await completePendingOnboarding(data.session.user.id, pendingOnboarding);
-        setProfile(completedProfile);
-        setPlan(pendingOnboarding.plan);
-        setIsOnboarded(true);
-        clearPendingOnboarding();
-        setLoading(false);
-        router.replace('/(tabs)/home');
-        return;
-      } catch (saveError) {
-        setLoading(false);
-        Alert.alert('Error', saveError instanceof Error ? saveError.message : 'No se pudo guardar tu rutina');
-        return;
+    if (!error && data.session?.user) {
+      setDevMode(false);
+      if (pendingOnboarding) {
+        try {
+          const completedProfile = await completePendingOnboarding(data.session.user.id, pendingOnboarding);
+          setProfile(completedProfile);
+          setPlan(pendingOnboarding.plan);
+          setIsOnboarded(true);
+          clearPendingOnboarding();
+          setLoading(false);
+          router.replace('/(tabs)/home');
+          return;
+        } catch (saveError) {
+          setLoading(false);
+          Alert.alert('Error', saveError instanceof Error ? saveError.message : 'No se pudo guardar tu rutina');
+          return;
+        }
       }
     }
 
@@ -110,9 +113,15 @@ export default function LoginScreen() {
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity onPress={handleDevMode} className="mt-8 items-center py-2">
-        <Text className="text-[#555555] text-xs">Modo desarrollo (sin conexion)</Text>
-      </TouchableOpacity>
+      {__DEV__ && (
+        <TouchableOpacity
+          onPress={handleDevMode}
+          className="mt-8 flex-row items-center justify-center gap-2 py-2"
+        >
+          <Ionicons name="bug" size={14} color="#555555" />
+          <Text className="text-[#555555] text-xs">Entrar en modo desarrollo (sin conexion)</Text>
+        </TouchableOpacity>
+      )}
     </KeyboardAvoidingView>
   );
 }

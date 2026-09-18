@@ -68,6 +68,7 @@ export default function RootLayout() {
 
   async function loadUserData(userId: string) {
     try {
+      setDevMode(false);
       const { pendingOnboarding, clearPendingOnboarding } = useUserStore.getState();
       if (pendingOnboarding) {
         const completedProfile = await completePendingOnboarding(userId, pendingOnboarding);

@@ -732,6 +732,20 @@ Se construyó la aplicación completa desde cero. Archivos creados:
 - [x] `expo-doctor`: 18/18 checks pasados. `expo router` instalado tambien con su config plugin (`expo-font`).
 - [x] Verificado: `tsc --noEmit` sin errores y bundle Android de produccion compila (4.8MB).
 
+### 32. Fix pantalla blanca en web (import.meta + color scheme)
+- [x] **BUG CRITICO**: Web dev mostraba pantalla completamente blanca. Causa raiz: `zustand/esm/middleware.mjs` usa `import.meta.env` (middleware devtools), y Metro dev sirve el bundle web como script clasico (`defer`, sin `type=module`) → `Uncaught SyntaxError: Cannot use 'import.meta' outside a module`. Solo afectaba a web dev (produccion lo minifica correctamente y Android resuelve el .mjs igualmente pero Metro en native usa la version CJS via la condicion `react-native`).
+- [x] `metro.config.js`: `config.resolver.resolveRequest` redirige en web (`platform === "web"`) los imports de zustand a las versiones CommonJS de la raiz: `zustand` → `index.js`, `zustand/middleware` → `middleware.js`, `zustand/vanilla` → `vanilla.js`, `zustand/react` → `react.js`. Estas son las que NO usan `import.meta`. Verificado: el bundle dev web ya no contiene `import.meta.env`.
+- [x] *Ojo*: no existen los submodulos `.mjs` individuales de `zustand/middleware` (solo `.d.mts`), por eso no se pudo evitar el bundle completo con un import por subpath; `persist`/`createJSONStorage` viven en el mismo `middleware.mjs` que `devtools`.
+- [x] **BUG menor**: consola web lanzaba `Cannot manually set color scheme, as dark mode is type 'media'` (de `react-native-css-interop`/NativeWind cargando la stylesheet con flag `darkMode: media`). `tailwind.config.js` ahora declara `darkMode: "class"` (la app no usa variantes `dark:`, el diseno no cambia) y el error desaparece.
+- [x] Verificado con Edge headless (`--dump-dom`): sin errores en consola y el DOM renderiza la pantalla de bienvenida (Kensei / "Comenzar encuesta").
+- [x] Para desarrollo web local: lanzar `npx expo start --web` (quitar `CI=1` para hot reload). F5 limpio (Ctrl+Shift+R) si Metro no detecta cambios.
+
+### 33. Fix modo desarrollo persistiendo tras iniciar sesion real (Septiembre 2026)
+- [x] **BUG**: el boton "Modo desarrollo (sin conexion)" aparecia siempre al final del login. `isDevMode` se persiste en AsyncStorage y tenia prioridad sobre la sesion, asi que si se activaba una vez, la app seguia en modo desarrollo aunque el usuario entrara con su cuenta real (store en `stores/userStore.ts`).
+- [x] `login.tsx`: al iniciar sesion con exito (`data.session?.user`) se llama `setDevMode(false)`. El enlace de modo desarrollo ahora solo se muestra si `__DEV__` (builds de desarrollo) y con icono de bug para que se vea como boton (texto: "Entrar en modo desarrollo (sin conexion)").
+- [x] `register.tsx`: al obtener sesion tras el registro tambien se llama `setDevMode(false)`.
+- [x] `app/_layout.tsx`: `loadUserData()` resetea `setDevMode(false)` siempre que haya usuario autenticado, cubriendo cualquier estado persistido anterior.
+
 ---
 
 *Ultima actualizacion: Septiembre 2026*

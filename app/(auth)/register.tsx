@@ -16,7 +16,7 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { from } = useLocalSearchParams<{ from?: string }>();
-  const { pendingOnboarding, setProfile, setIsOnboarded, clearPendingOnboarding } = useUserStore();
+  const { pendingOnboarding, setDevMode, setProfile, setIsOnboarded, clearPendingOnboarding } = useUserStore();
   const { setPlan } = useTrainingStore();
   const hasPendingOnboarding = from === 'onboarding' && !!pendingOnboarding;
 
@@ -37,31 +37,34 @@ export default function RegisterScreen() {
       setLoading(false);
       Alert.alert('Error', error.message);
     } else {
-      if (data.session?.user && pendingOnboarding) {
-        try {
-          const completedProfile = await completePendingOnboarding(data.session.user.id, pendingOnboarding);
-          setProfile(completedProfile);
-          setPlan(pendingOnboarding.plan);
-          setIsOnboarded(true);
-          clearPendingOnboarding();
-          setLoading(false);
-          router.replace('/(tabs)/home');
-          return;
-        } catch (saveError) {
-          setLoading(false);
-          Alert.alert('Error', saveError instanceof Error ? saveError.message : 'No se pudo guardar tu rutina');
-          return;
+      if (data.session?.user) {
+        setDevMode(false);
+        if (pendingOnboarding) {
+          try {
+            const completedProfile = await completePendingOnboarding(data.session.user.id, pendingOnboarding);
+            setProfile(completedProfile);
+            setPlan(pendingOnboarding.plan);
+            setIsOnboarded(true);
+            clearPendingOnboarding();
+            setLoading(false);
+            router.replace('/(tabs)/home');
+            return;
+          } catch (saveError) {
+            setLoading(false);
+            Alert.alert('Error', saveError instanceof Error ? saveError.message : 'No se pudo guardar tu rutina');
+            return;
+          }
         }
-      }
 
-      setLoading(false);
-      Alert.alert(
-        'Registro exitoso',
-        hasPendingOnboarding
-          ? 'Revisa tu email para confirmar tu cuenta. Al iniciar sesion guardaremos tu rutina personalizada.'
-          : 'Revisa tu email para confirmar tu cuenta.'
-      );
-      router.replace('/(auth)/login');
+        setLoading(false);
+        Alert.alert(
+          'Registro exitoso',
+          hasPendingOnboarding
+            ? 'Revisa tu email para confirmar tu cuenta. Al iniciar sesion guardaremos tu rutina personalizada.'
+            : 'Revisa tu email para confirmar tu cuenta.'
+        );
+        router.replace('/(auth)/login');
+      }
     }
   }
 
