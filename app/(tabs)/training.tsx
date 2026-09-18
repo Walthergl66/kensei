@@ -7,7 +7,6 @@ import { useTrainingStore } from '@/stores/trainingStore';
 import { useUserStore } from '@/stores/userStore';
 import { supabase, saveTrainingPlan, deactivateOtherPlans } from '@/lib/supabase';
 import { generateTrainingPlan } from '@/lib/agent';
-import { DEFAULT_PLAN } from '@/constants';
 import SessionCard from '@/components/training/SessionCard';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
@@ -17,10 +16,12 @@ export default function TrainingScreen() {
   const { plan, setPlan } = useTrainingStore();
   const { profile, session, isDevMode } = useUserStore();
   const [regenerating, setRegenerating] = useState(false);
+  const [regenError, setRegenError] = useState<string | null>(null);
 
   async function handleRegenerate() {
     if (!profile) return;
     setRegenerating(true);
+    setRegenError(null);
 
     try {
       const newPlan = await generateTrainingPlan(profile);
@@ -31,9 +32,10 @@ export default function TrainingScreen() {
       }
       
       setPlan(newPlan);
-    } catch (error: any) {
-      Alert.alert('Error del Agente', error.message || 'No se pudo generar el plan. Usando plan por defecto.');
-      setPlan(DEFAULT_PLAN);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'No se pudo generar el plan. Intenta de nuevo.';
+      setRegenError(message);
+      Alert.alert('Error del Agente', message);
     } finally {
       setRegenerating(false);
     }
@@ -93,6 +95,12 @@ export default function TrainingScreen() {
             onPress={() => router.push(`/training/${index}`)}
           />
         ))}
+
+        {regenError && (
+          <View className="bg-[#F44336]/10 border border-[#F44336]/40 rounded-2xl p-3 mb-4">
+            <Text className="text-[#F44336] text-xs">{regenError}</Text>
+          </View>
+        )}
 
         <View className="py-8">
           <Button
