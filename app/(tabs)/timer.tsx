@@ -8,6 +8,7 @@ import TimerConfigComponent from '@/components/timer/TimerConfig';
 import SessionSaveSheet from '@/components/timer/SessionSaveSheet';
 import { saveSession } from '@/lib/supabase';
 import { useUserStore } from '@/stores/userStore';
+import { confirmAction } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 
 function formatDuration(totalSeconds: number): string {
@@ -191,12 +192,7 @@ export default function TimerScreen() {
                       preset={preset}
                       selected={isSelected}
                       onPress={() => loadPreset(preset)}
-                      onDelete={() => {
-                        Alert.alert('Eliminar timer', `Eliminar "${preset.name}"?`, [
-                          { text: 'Cancelar', style: 'cancel' },
-                          { text: 'Eliminar', style: 'destructive', onPress: () => deletePreset(preset.id) },
-                        ]);
-                      }}
+                      onDelete={() => confirmAction('Eliminar timer', `Eliminar "${preset.name}"?`, () => deletePreset(preset.id))}
                     />
                   );
                 })}

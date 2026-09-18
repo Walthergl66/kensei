@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUserStore } from '@/stores/userStore';
 import { useTrainingStore } from '@/stores/trainingStore';
-import { getInitials } from '@/lib/utils';
+import { getInitials, confirmAction } from '@/lib/utils';
 import { registerForPushNotificationsAsync, scheduleDailyReminder, cancelAllReminders } from '@/lib/notifications';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
@@ -68,22 +68,16 @@ export default function ProfileScreen() {
   }
 
   function handleRestartOnboarding() {
-    Alert.alert(
+    confirmAction(
       'Reiniciar onboarding',
       'Estas seguro? Esto borrara tus datos actuales.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Reiniciar',
-          style: 'destructive',
-          onPress: () => {
-            setProfile(null);
-            setIsOnboarded(false);
-            clearPlan();
-            router.replace('/(onboarding)/welcome');
-          },
-        },
-      ]
+      () => {
+        setProfile(null);
+        setIsOnboarded(false);
+        clearPlan();
+        router.replace('/(onboarding)/welcome');
+      },
+      'Reiniciar'
     );
   }
 

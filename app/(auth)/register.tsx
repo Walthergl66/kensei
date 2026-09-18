@@ -42,7 +42,12 @@ export default function RegisterScreen() {
     const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
     if (error) {
       setLoading(false);
-      showError(error.message);
+      const status = (error as { status?: number }).status;
+      if (status === 429) {
+        showError('Has hecho demasiados intentos en poco tiempo. Espera unos minutos e intenta de nuevo.');
+      } else {
+        showError(error.message);
+      }
     } else {
       if (data.session?.user) {
         setDevMode(false);

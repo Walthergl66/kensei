@@ -1,3 +1,5 @@
+import { Alert } from 'react-native';
+
 export function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
@@ -41,4 +43,15 @@ export function validateEmail(email: string): boolean {
 export function getDisciplineIcon(discipline: string): string {
   const icons: Record<string, string> = { boxing: 'boxing', mma: 'mma', both: 'boxing' };
   return icons[discipline] || 'boxing';
+}
+
+export function confirmAction(title: string, message: string, onConfirm: () => void, confirmText: string = 'Eliminar') {
+  if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+    if (window.confirm(`${title}\n\n${message}`)) onConfirm();
+    return;
+  }
+  Alert.alert(title, message, [
+    { text: 'Cancelar', style: 'cancel' },
+    { text: confirmText, style: 'destructive', onPress: onConfirm },
+  ]);
 }
