@@ -15,27 +15,34 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const { from } = useLocalSearchParams<{ from?: string }>();
   const { pendingOnboarding, setDevMode, setProfile, setIsOnboarded, clearPendingOnboarding } = useUserStore();
   const { setPlan } = useTrainingStore();
   const hasPendingOnboarding = from === 'onboarding' && !!pendingOnboarding;
 
+  function showError(message: string) {
+    setErrorMsg(message);
+    Alert.alert('Error', message);
+  }
+
   async function handleRegister() {
-    if (!email.trim()) { Alert.alert('Error', 'Ingresa tu email'); return; }
-    if (!validateEmail(email.trim())) { Alert.alert('Error', 'Email invalido'); return; }
-    if (!password) { Alert.alert('Error', 'Ingresa una contrasena'); return; }
-    if (password.length < 6) { Alert.alert('Error', 'La contrasena debe tener al menos 6 caracteres'); return; }
+    if (!email.trim()) { showError('Ingresa tu email'); return; }
+    if (!validateEmail(email.trim())) { showError('Email invalido'); return; }
+    if (!password) { showError('Ingresa una contrasena'); return; }
+    if (password.length < 6) { showError('La contrasena debe tener al menos 6 caracteres'); return; }
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Las contrasenas no coinciden');
+      showError('Las contrasenas no coinciden');
       return;
     }
     if (!supabase) return;
 
+    setErrorMsg(null);
     setLoading(true);
     const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
     if (error) {
       setLoading(false);
-      Alert.alert('Error', error.message);
+      showError(error.message);
     } else {
       if (data.session?.user) {
         setDevMode(false);
@@ -51,18 +58,13 @@ export default function RegisterScreen() {
             return;
           } catch (saveError) {
             setLoading(false);
-            Alert.alert('Error', saveError instanceof Error ? saveError.message : 'No se pudo guardar tu rutina');
+            showError(saveError instanceof Error ? saveError.message : 'No se pudo guardar tu rutina');
             return;
           }
         }
 
         setLoading(false);
-        Alert.alert(
-          'Registro exitoso',
-          hasPendingOnboarding
-            ? 'Revisa tu email para confirmar tu cuenta. Al iniciar sesion guardaremos tu rutina personalizada.'
-            : 'Revisa tu email para confirmar tu cuenta.'
-        );
+        showError('Revisa tu email: debes confirmar tu cuenta');
         router.replace('/(auth)/login');
       }
     }

@@ -746,6 +746,8 @@ Se construyó la aplicación completa desde cero. Archivos creados:
 - [x] `register.tsx`: al obtener sesion tras el registro tambien se llama `setDevMode(false)`.
 - [x] `app/_layout.tsx`: `loadUserData()` resetea `setDevMode(false)` siempre que haya usuario autenticado, cubriendo cualquier estado persistido anterior.
 - [x] **BUG**: login exitoso sin `pendingOnboarding` no navegaba a ningun lado — el usuario se quedaba en la pantalla de login ("no me deja iniciar sesion"). `login.tsx` ahora, tras `signInWithPassword` exitoso: consulta `getUserProfile()`/`getActiveTrainingPlan()`, navega a `(tabs)/home` si hay perfil, o a `(onboarding)/welcome` si no (incluye el caso de SQL de Supabase sin ejecutar, que lanza error y se trata como sin perfil).
+- [x] **BUG WEB**: `Alert.alert` es un no-op en React Native Web (`static alert() {}` en `react-native-web/dist/exports/Alert/index.js`), asi que los errores de login se tragaban en silencio en el navegador. `login.tsx` ahora muestra el error inline en rojo en la pantalla (ademas del Alert para native) y lo limpia al escribir.
+- [x] **BUG**: `saveUserProfile()` usaba `upsert` sin `onConflict`, por defecto apuntaba a la PK `id`; como la unicidad real es `user_id` (constraint `user_profile_user_id_key`), al guardar el perfil de un usuario que ya tenia fila rompia con `duplicate key value violates unique constraint`. Ahora usa `upsert({...}, { onConflict: 'user_id' })`.
 
 ---
 

@@ -37,7 +37,7 @@ export async function saveUserProfile(
   const { error } = await supabase.from('user_profile').upsert({
     user_id: userId,
     ...profile,
-  });
+  }, { onConflict: 'user_id' });
   if (error) throw new Error(error.message);
 }
 
