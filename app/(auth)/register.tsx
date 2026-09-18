@@ -69,8 +69,10 @@ export default function RegisterScreen() {
         }
 
         setLoading(false);
-        showError('Revisa tu email: debes confirmar tu cuenta');
-        router.replace('/(auth)/login');
+      } else {
+        setLoading(false);
+        showError('Revisa tu email: te enviamos un enlace para confirmar tu cuenta. Luego inicia sesion.');
+        router.replace('/(auth)/login?emailSent=1');
       }
     }
   }

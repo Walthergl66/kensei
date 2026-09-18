@@ -776,6 +776,11 @@ Se construyó la aplicación completa desde cero. Archivos creados:
 
 **Pendiente en Supabase**: el usuario `diag.kensei.1789693270@proton.me` fue creado durante el diagnostico del login — borrarlo desde Authentication > Users. La confirmacion de email sigue activa (`mailer_autoconfirm: false`); para desarrollo se puede desactivar en Authentication > Settings > Disable email confirmation.
 
+### 35. Fix registro con confirmacion de email y aviso de bundle viejo (Septiembre 2026)
+- [x] **BUG** `app/(auth)/register.tsx`: con la confirmacion de email activa, `signUp` no devuelve sesion y el `else` no hacia nada — el boton "Crear cuenta" quedaba congelado en `loading`. Ahora si no hay sesion: muestra "revisa tu email" (inline, visible en web) y navega a `/(auth)/login?emailSent=1`.
+- [x] **UX** `app/(auth)/login.tsx`: si viene de registrar con `emailSent=1` muestra un aviso dorado "cuenta creada, confirma tu correo" (usando `useLocalSearchParams`). Se limpia al escribir o al intentar login.
+- [x] **NOTA** El usuario reportó errores que ya estaban corregidos (404 de Groq con `llama-3.3-70b-versatile`, 409 repetidos en `user_profile`, warning de `pointerEvents`). Causa: **Metro en modo CI no tiene hot reload** y seguia sirviendo el bundle viejo del puerto 8081. Solucion: `taskkill //PID <pid>` del proceso en 8081 y relanzar `npx expo start --web --port 8081`. Verificado con Edge headless: la web arranca, renderiza la pantalla de bienvenida y sin `Cannot use 'import.meta'` (los `import.meta` restantes en el bundle son solo comentarios de Expo y la guarda `typeof`).
+
 ---
 
 *Ultima actualizacion: Septiembre 2026*

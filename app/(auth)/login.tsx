@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { supabase, getUserProfile, getActiveTrainingPlan } from '@/lib/supabase';
 import { completePendingOnboarding } from '@/lib/onboarding';
 import { useUserStore } from '@/stores/userStore';
@@ -17,6 +17,7 @@ export default function LoginScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const { pendingOnboarding, setDevMode, setProfile, setIsOnboarded, clearPendingOnboarding } = useUserStore();
   const { setPlan } = useTrainingStore();
+  const { emailSent } = useLocalSearchParams<{ emailSent?: string }>();
 
   function showError(message: string) {
     setErrorMsg(message);
@@ -140,6 +141,14 @@ export default function LoginScreen() {
       {errorMsg && (
         <View className="bg-[#F44336]/10 border border-[#F44336]/40 rounded-2xl p-3 mb-4">
           <Text className="text-[#F44336] text-xs">{errorMsg}</Text>
+        </View>
+      )}
+
+      {!errorMsg && emailSent === '1' && (
+        <View className="bg-[#E8C547]/10 border border-[#E8C547]/30 rounded-2xl p-3 mb-4">
+          <Text className="text-[#E8C547] text-xs">
+            Cuenta creada. Revisa tu email (y spam) y confirma tu correo para poder iniciar sesion.
+          </Text>
         </View>
       )}
 
