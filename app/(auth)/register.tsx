@@ -91,7 +91,7 @@ export default function RegisterScreen() {
         placeholder="tu@email.com"
         placeholderTextColor="#555555"
         value={email}
-        onChangeText={setEmail}
+        onChangeText={(t) => { setEmail(t); if (errorMsg) setErrorMsg(null); }}
         autoCapitalize="none"
         keyboardType="email-address"
       />
@@ -123,6 +123,12 @@ export default function RegisterScreen() {
           <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#666666" />
         </TouchableOpacity>
       </View>
+
+      {errorMsg && (
+        <View className="bg-[#F44336]/10 border border-[#F44336]/40 rounded-2xl p-3 mb-4">
+          <Text className="text-[#F44336] text-xs">{errorMsg}</Text>
+        </View>
+      )}
 
       <Button title="Crear cuenta" onPress={handleRegister} loading={loading} disabled={loading} size="lg" />
       <TouchableOpacity onPress={() => router.back()} className="mt-5 items-center">
