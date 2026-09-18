@@ -1,5 +1,5 @@
 import { GROQ_API_KEY, GROQ_MODEL, GROQ_API_URL, GEMINI_API_KEY, GEMINI_MODEL, GEMINI_API_URL } from '@/constants';
-import { UserProfile, TrainingPlan } from '@/types';
+import { UserProfile, TrainingPlan, PlanSession, Exercise, Intensity } from '@/types';
 
 const TIMEOUT_MS = 20000;
 const MAX_RETRIES = 3;
@@ -182,6 +182,76 @@ export async function getCoachAdvice(profile: UserProfile): Promise<string> {
   }
 }
 
+const asString = (value: unknown, fallback: string): string =>
+  typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
+
+const asNumber = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && isFinite(value) ? value : fallback;
+
+const intensityOf = (value: unknown): Intensity =>
+  value === 'low' || value === 'medium' || value === 'high' ? value : 'medium';
+
+function sanitizeTrainingPlan(raw: unknown, profile: UserProfile): TrainingPlan {
+  const source = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+  const weeklyRaw = source.weekly_structure;
+  if (!Array.isArray(weeklyRaw)) {
+    throw new Error('Estructura invalida');
+  }
+
+  const sessions: PlanSession[] = [];
+  for (const item of weeklyRaw) {
+    if (typeof item !== 'object' || item === null) continue;
+    const s = item as Record<string, unknown>;
+    if (!Array.isArray(s.exercises)) continue;
+
+    const exercises: Exercise[] = [];
+    for (const e of s.exercises) {
+      if (typeof e !== 'object' || e === null) continue;
+      const ex = e as Record<string, unknown>;
+      if (!asString(ex.name, '')) continue;
+      exercises.push({
+        name: asString(ex.name, 'Ejercicio'),
+        description: asString(ex.description, ''),
+        duration_seconds: asNumber(ex.duration_seconds, 60),
+        sets: asNumber(ex.sets, 1),
+        reps: ex.reps == null ? null : asNumber(ex.reps, 0),
+      });
+    }
+
+    sessions.push({
+      day: asString(s.day, `Dia ${sessions.length + 1}`),
+      session_type: asString(s.session_type, 'Entrenamiento'),
+      duration_minutes: asNumber(s.duration_minutes, 30),
+      rounds: asNumber(s.rounds, 3),
+      round_duration_seconds: asNumber(s.round_duration_seconds, 180),
+      rest_seconds: asNumber(s.rest_seconds, 60),
+      exercises,
+      focus: asString(s.focus, 'Entrenamiento general'),
+      intensity: intensityOf(s.intensity),
+    });
+  }
+
+  if (sessions.length === 0) {
+    throw new Error('Estructura invalida');
+  }
+
+  const recommendations = Array.isArray(source.recommendations)
+    ? source.recommendations.filter((r): r is string => typeof r === 'string')
+    : [];
+  const warnings = Array.isArray(source.warnings)
+    ? source.warnings.filter((w): w is string => typeof w === 'string')
+    : [];
+
+  return {
+    plan_name: asString(source.plan_name, `Plan de ${profile.name}`),
+    duration_weeks: asNumber(source.duration_weeks, 4),
+    sessions_per_week: sessions.length,
+    weekly_structure: sessions,
+    recommendations,
+    warnings,
+  };
+}
+
 export async function generateTrainingPlan(profile: UserProfile): Promise<TrainingPlan> {
   const userMessage = `
     Genera un plan de entrenamiento para este usuario:
@@ -200,12 +270,12 @@ export async function generateTrainingPlan(profile: UserProfile): Promise<Traini
   try {
     const clean = raw.replace(/```json|```/g, '').trim();
     if (!clean) throw new Error('Respuesta vacia');
-    const parsed = JSON.parse(clean) as TrainingPlan;
-    if (!parsed.weekly_structure || !Array.isArray(parsed.weekly_structure) || parsed.weekly_structure.length === 0) {
-      throw new Error('Estructura invalida');
+    const parsed = JSON.parse(clean) as unknown;
+    return sanitizeTrainingPlan(parsed, profile);
+  } catch (error) {
+    if (error instanceof Error && error.message !== 'La IA devolvio una respuesta invalida. Intenta de nuevo.') {
+      throw error;
     }
-    return parsed;
-  } catch {
     throw new Error('La IA devolvio una respuesta invalida. Intenta de nuevo.');
   }
 }
