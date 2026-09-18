@@ -1,7 +1,18 @@
 import { deactivateOtherPlans, saveTrainingPlan, saveUserProfile } from '@/lib/supabase';
 import { PendingOnboarding, UserProfile } from '@/types';
 
-export async function completePendingOnboarding(userId: string, pending: PendingOnboarding): Promise<UserProfile> {
+let pendingComplete: Promise<UserProfile> | null = null;
+
+export function completePendingOnboarding(userId: string, pending: PendingOnboarding): Promise<UserProfile> {
+  if (!pendingComplete) {
+    pendingComplete = doCompletePendingOnboarding(userId, pending).finally(() => {
+      pendingComplete = null;
+    });
+  }
+  return pendingComplete;
+}
+
+async function doCompletePendingOnboarding(userId: string, pending: PendingOnboarding): Promise<UserProfile> {
   await saveUserProfile(userId, pending.profileData);
   await deactivateOtherPlans(userId);
   await saveTrainingPlan(userId, pending.plan);

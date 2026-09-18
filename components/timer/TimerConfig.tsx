@@ -209,7 +209,6 @@ function WheelColumn({ values, selected, label, formatter, onSelect }: {
           onMomentumScrollEnd={handleMomentumEnd}
         />
         <View
-          pointerEvents="none"
           className="absolute left-1 right-1 rounded-xl"
           style={{
             top: ITEM_HEIGHT * 2,
@@ -217,6 +216,7 @@ function WheelColumn({ values, selected, label, formatter, onSelect }: {
             backgroundColor: 'rgba(255,255,255,0.06)',
             borderWidth: 1,
             borderColor: 'rgba(255,255,255,0.10)',
+            pointerEvents: 'none',
           }}
         />
       </View>
