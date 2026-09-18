@@ -781,6 +781,14 @@ Se construyó la aplicación completa desde cero. Archivos creados:
 - [x] **UX** `app/(auth)/login.tsx`: si viene de registrar con `emailSent=1` muestra un aviso dorado "cuenta creada, confirma tu correo" (usando `useLocalSearchParams`). Se limpia al escribir o al intentar login.
 - [x] **NOTA** El usuario reportó errores que ya estaban corregidos (404 de Groq con `llama-3.3-70b-versatile`, 409 repetidos en `user_profile`, warning de `pointerEvents`). Causa: **Metro en modo CI no tiene hot reload** y seguia sirviendo el bundle viejo del puerto 8081. Solucion: `taskkill //PID <pid>` del proceso en 8081 y relanzar `npx expo start --web --port 8081`. Verificado con Edge headless: la web arranca, renderiza la pantalla de bienvenida y sin `Cannot use 'import.meta'` (los `import.meta` restantes en el bundle son solo comentarios de Expo y la guarda `typeof`).
 
+### 36. Cuestionario adaptativo y flujo login-antes-de-cuestionario (Septiembre 2026)
+- [x] **FLUJO** `app/index.tsx`: con sesion y plan activo → `(tabs)/home`; con sesion pero sin plan o sin perfil → `(onboarding)/questionnaire` directo (ya no via welcome); solo sin sesion → `welcome`. El guard en `_layout.tsx` (isLoading incluye la carga del plan) evita flash hacia el cuestionario.
+- [x] **CUESTIONARIO** `constants/survey.ts` (nuevo) + `app/(onboarding)/questionnaire.tsx`: el modelo fijo de 7 pasos se reemplazo por `QUESTION_LIST` con ramas adaptativas. La primera eleccion (disciplina) decide la pregunta siguiente ("En que te enfocas?") con opciones segun boxeo/MMA/ambas (power/defense/footwork/all, striking/grappling/clinch/balanced, etc.), y el objetivo decide su pregunta de contexto (compete→timeline de competencia, fitness→formato, selfdefense→situaciones, beginner→estilo de aprendizaje). Cada pregunta define `dependsOn` para invalidar respuestas dependientes si se vuelve atras y se cambia una rama. El total del StepIndicator es fijo (preguntas de la lista + 1).
+- [x] **IA** `lib/agent.ts`: `generateTrainingPlan(profile, extraContext?)` concatena las preferencias del cuestionario al prompt para adaptar el plan. `buildPreferenceSummary()` arma el resumen con las etiquetas humanas elegidas.
+- [x] **CONTEXTO PERSISTENTE** `stores/userStore.ts`: nuevo `profileContext` persistido; `app/(tabs)/training.tsx` lo reusa en "Regenerar plan" para respetar las preferencias del cuestionario original (no solo evolucionan en la creacion).
+- [x] **ERROR JSON** `lib/agent.ts`: el error "Unterminated string in JSON" era un JSON truncado del LLM. Fixes: Groq con `max_tokens: 8192`, `parsePlanJson` repara JSON cortado (cierra cadenas/llaves/trailing commas) y reintento unico con instruccion reforzada antes de fallar con mensaje amigable (sin filtrar el texto crudo de JSON.parse).
+- [x] Verificado: `npx tsc --noEmit` sin errores y `expo export --platform web` compila.
+
 ---
 
 *Ultima actualizacion: Septiembre 2026*
