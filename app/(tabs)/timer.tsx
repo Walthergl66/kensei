@@ -64,7 +64,7 @@ function PresetCard({ preset, selected, onPress, onDelete }: {
 }
 
 export default function TimerScreen() {
-  const { config, status, currentRound, timeLeft, sessionSource, presets, setConfig, startTimer, stopTimer, resetTimer, tick, pauseTimer, resumeTimer, savePreset, loadPreset, deletePreset, getPresetsForUser } = useTimerStore();
+  const { config, status, currentRound, timeLeft, sessionSource, sessionDay, presets, setConfig, startTimer, stopTimer, resetTimer, tick, pauseTimer, resumeTimer, savePreset, loadPreset, deletePreset, getPresetsForUser } = useTimerStore();
   const { session, isDevMode, profile } = useUserStore();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showSave, setShowSave] = useState(false);
@@ -72,6 +72,7 @@ export default function TimerScreen() {
   const [presetName, setPresetName] = useState('');
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [timerTab, setTimerTab] = useState<'new' | 'saved'>('new');
+  const [resumeNonce, setResumeNonce] = useState(0);
 
   const currentUserId = isDevMode ? 'dev' : (session?.user?.id || profile?.user_id || 'guest');
   const userPresets = useMemo(() => getPresetsForUser(currentUserId), [presets, currentUserId]);
@@ -80,12 +81,9 @@ export default function TimerScreen() {
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       if (nextState !== 'active') {
         pauseTimer();
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
       } else {
         resumeTimer();
+        setResumeNonce((n) => n + 1);
       }
     });
     return () => subscription.remove();
@@ -93,6 +91,7 @@ export default function TimerScreen() {
 
   useEffect(() => {
     if (status === 'running' || status === 'resting' || status === 'warning') {
+      if (intervalRef.current) clearInterval(intervalRef.current);
       intervalRef.current = setInterval(() => {
         tick();
       }, 1000);
@@ -108,7 +107,7 @@ export default function TimerScreen() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [status]);
+  }, [status, resumeNonce]);
 
   async function handleSave(rating: number, notes: string): Promise<boolean> {
     if (isDevMode || !session?.user?.id) return true;
@@ -117,12 +116,12 @@ export default function TimerScreen() {
     try {
       await saveSession(session.user.id, {
         date: new Date().toISOString().split('T')[0],
-        discipline: sessionSource || 'boxing',
+        discipline: profile?.discipline || 'boxing',
         duration_minutes: Math.round((config.rounds * config.round_duration + (config.rounds - 1) * config.rest_duration) / 60),
         rounds_completed: config.rounds,
         notes,
         rating,
-        plan_session_day: sessionSource || undefined,
+        plan_session_day: sessionDay || undefined,
       });
       return true;
     } catch {

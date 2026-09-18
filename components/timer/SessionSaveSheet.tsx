@@ -29,6 +29,12 @@ export default function SessionSaveSheet({ onSave, onDiscard, saving: externalSa
           <Text className="text-3xl text-[#4CAF50]">✓</Text>
         </View>
         <Text className="text-[#4CAF50] text-lg font-bold">Entrenamiento guardado</Text>
+        <TouchableOpacity
+          onPress={onDiscard}
+          className="mt-6 px-8 py-3 rounded-xl bg-[#E8C547] items-center"
+        >
+          <Text className="text-[#0A0A0A] font-bold">Listo</Text>
+        </TouchableOpacity>
       </View>
     );
   }

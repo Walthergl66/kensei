@@ -18,6 +18,7 @@ interface TimerState {
   timeLeft: number;
   totalTimeLeft: number;
   sessionSource: string | null;
+  sessionDay: string | null;
   pausedAt: number | null;
   presets: TimerPreset[];
   setConfig: (config: Partial<TimerConfig>) => void;
@@ -27,7 +28,7 @@ interface TimerState {
   tick: () => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
-  startFromSession: (config: TimerConfig, sessionName: string) => void;
+  startFromSession: (config: TimerConfig, sessionName: string, sessionDay?: string) => void;
   savePreset: (name: string, userId: string) => void;
   deletePreset: (id: string) => void;
   loadPreset: (preset: TimerPreset) => void;
@@ -53,6 +54,7 @@ export const useTimerStore = create<TimerState>()(
       timeLeft: DEFAULT_TIMER.round_duration,
       totalTimeLeft: calculateTotalTime(DEFAULT_TIMER),
       sessionSource: null,
+      sessionDay: null,
       pausedAt: null,
       presets: [...SYSTEM_PRESETS],
 
@@ -81,7 +83,7 @@ export const useTimerStore = create<TimerState>()(
         });
       },
 
-      stopTimer: () => set({ status: 'idle', sessionSource: null, pausedAt: null }),
+      stopTimer: () => set({ status: 'idle', sessionSource: null, sessionDay: null, pausedAt: null }),
 
       resetTimer: () =>
         set({
@@ -90,6 +92,7 @@ export const useTimerStore = create<TimerState>()(
           timeLeft: get().config.round_duration,
           totalTimeLeft: calculateTotalTime(get().config),
           sessionSource: null,
+          sessionDay: null,
           pausedAt: null,
         }),
 
@@ -117,7 +120,6 @@ export const useTimerStore = create<TimerState>()(
             if (currentRound < config.rounds) {
               currentStatus = 'resting';
               remainingTime = config.rest_duration + remainingTime;
-              currentRound = currentRound;
             } else {
               set({ status: 'finished', timeLeft: 0, totalTimeLeft: 0, pausedAt: null });
               return;
@@ -190,7 +192,7 @@ export const useTimerStore = create<TimerState>()(
         }
       },
 
-      startFromSession: (config, sessionName) =>
+      startFromSession: (config, sessionName, sessionDay) =>
         set({
           config,
           status: 'idle',
@@ -198,6 +200,7 @@ export const useTimerStore = create<TimerState>()(
           timeLeft: config.round_duration,
           totalTimeLeft: calculateTotalTime(config),
           sessionSource: sessionName,
+          sessionDay: sessionDay ?? null,
           pausedAt: null,
         }),
 

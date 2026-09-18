@@ -37,7 +37,8 @@ export default function SessionDetailScreen() {
         rest_duration: session.rest_seconds,
         warning_seconds: 10,
       },
-      session.session_type
+      session.session_type,
+      session.day
     );
     router.push('/(tabs)/timer');
   }
