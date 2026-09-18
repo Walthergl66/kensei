@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { supabase } from '@/lib/supabase';
+import { supabase, getUserProfile, getActiveTrainingPlan } from '@/lib/supabase';
 import { completePendingOnboarding } from '@/lib/onboarding';
 import { useUserStore } from '@/stores/userStore';
 import { useTrainingStore } from '@/stores/trainingStore';
@@ -14,39 +14,78 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const { pendingOnboarding, setDevMode, setProfile, setIsOnboarded, clearPendingOnboarding } = useUserStore();
   const { setPlan } = useTrainingStore();
 
+  function showError(message: string) {
+    setErrorMsg(message);
+    Alert.alert('Error', message);
+  }
+
   async function handleLogin() {
     if (!supabase) return;
-    if (!email.trim()) { Alert.alert('Error', 'Ingresa tu email'); return; }
-    if (!validateEmail(email.trim())) { Alert.alert('Error', 'Email invalido'); return; }
-    if (!password) { Alert.alert('Error', 'Ingresa tu contrasena'); return; }
+    if (!email.trim()) { showError('Ingresa tu email'); return; }
+    if (!validateEmail(email.trim())) { showError('Email invalido'); return; }
+    if (!password) { showError('Ingresa tu contrasena'); return; }
 
+    setErrorMsg(null);
     setLoading(true);
     const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    if (!error && data.session?.user) {
-      setDevMode(false);
-      if (pendingOnboarding) {
-        try {
-          const completedProfile = await completePendingOnboarding(data.session.user.id, pendingOnboarding);
-          setProfile(completedProfile);
-          setPlan(pendingOnboarding.plan);
-          setIsOnboarded(true);
-          clearPendingOnboarding();
-          setLoading(false);
-          router.replace('/(tabs)/home');
-          return;
-        } catch (saveError) {
-          setLoading(false);
-          Alert.alert('Error', saveError instanceof Error ? saveError.message : 'No se pudo guardar tu rutina');
-          return;
-        }
+    if (error) {
+      setLoading(false);
+      const code = (error as { code?: string }).code;
+      if (code === 'email_not_confirmed') {
+        showError('Correo sin confirmar. Revisa tu bandeja (y spam) y haz clic en el enlace de confirmacion. Luego intenta de nuevo.');
+      } else {
+        showError(code === 'invalid_credentials' ? 'Credenciales invalidas. Revisa tu email y contrasena.' : error.message);
+      }
+      return;
+    }
+    if (!data.session?.user) {
+      setLoading(false);
+      showError('No se pudo iniciar sesion');
+      return;
+    }
+
+    setDevMode(false);
+
+    if (pendingOnboarding) {
+      try {
+        const completedProfile = await completePendingOnboarding(data.session.user.id, pendingOnboarding);
+        setProfile(completedProfile);
+        setPlan(pendingOnboarding.plan);
+        setIsOnboarded(true);
+        clearPendingOnboarding();
+        setLoading(false);
+        router.replace('/(tabs)/home');
+        return;
+      } catch (saveError) {
+        setLoading(false);
+        showError(saveError instanceof Error ? saveError.message : 'No se pudo guardar tu rutina');
+        return;
       }
     }
 
+    try {
+      const existingProfile = await getUserProfile(data.session.user.id);
+      if (existingProfile) {
+        setProfile(existingProfile);
+        setIsOnboarded(true);
+        const plan = await getActiveTrainingPlan(data.session.user.id);
+        if (plan) setPlan(plan);
+        setLoading(false);
+        router.replace('/(tabs)/home');
+        return;
+      }
+    } catch (profileError) {
+      // No hay tabla/perfil disponible (SQL no ejecutado en Supabase) -> se trata como sin onboarding
+    }
+
+    setProfile(null);
+    setIsOnboarded(false);
     setLoading(false);
-    if (error) Alert.alert('Error', error.message);
+    router.replace('/(onboarding)/welcome');
   }
 
   function handleDevMode() {
@@ -75,7 +114,7 @@ export default function LoginScreen() {
         placeholder="tu@email.com"
         placeholderTextColor="#555555"
         value={email}
-        onChangeText={setEmail}
+        onChangeText={(t) => { setEmail(t); if (errorMsg) setErrorMsg(null); }}
         autoCapitalize="none"
         keyboardType="email-address"
       />
@@ -87,7 +126,7 @@ export default function LoginScreen() {
           placeholder="Ingresa tu contrasena"
           placeholderTextColor="#555555"
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(t) => { setPassword(t); if (errorMsg) setErrorMsg(null); }}
           secureTextEntry={!showPassword}
         />
         <TouchableOpacity
@@ -97,6 +136,12 @@ export default function LoginScreen() {
           <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#666666" />
         </TouchableOpacity>
       </View>
+
+      {errorMsg && (
+        <View className="bg-[#F44336]/10 border border-[#F44336]/40 rounded-2xl p-3 mb-4">
+          <Text className="text-[#F44336] text-xs">{errorMsg}</Text>
+        </View>
+      )}
 
       <Button title="Iniciar sesion" onPress={handleLogin} loading={loading} disabled={loading} size="lg" />
       <TouchableOpacity onPress={() => router.push(pendingOnboarding ? '/(auth)/register?from=onboarding' : '/(auth)/register')} className="mt-5 items-center">

@@ -745,6 +745,7 @@ Se construyó la aplicación completa desde cero. Archivos creados:
 - [x] `login.tsx`: al iniciar sesion con exito (`data.session?.user`) se llama `setDevMode(false)`. El enlace de modo desarrollo ahora solo se muestra si `__DEV__` (builds de desarrollo) y con icono de bug para que se vea como boton (texto: "Entrar en modo desarrollo (sin conexion)").
 - [x] `register.tsx`: al obtener sesion tras el registro tambien se llama `setDevMode(false)`.
 - [x] `app/_layout.tsx`: `loadUserData()` resetea `setDevMode(false)` siempre que haya usuario autenticado, cubriendo cualquier estado persistido anterior.
+- [x] **BUG**: login exitoso sin `pendingOnboarding` no navegaba a ningun lado — el usuario se quedaba en la pantalla de login ("no me deja iniciar sesion"). `login.tsx` ahora, tras `signInWithPassword` exitoso: consulta `getUserProfile()`/`getActiveTrainingPlan()`, navega a `(tabs)/home` si hay perfil, o a `(onboarding)/welcome` si no (incluye el caso de SQL de Supabase sin ejecutar, que lanza error y se trata como sin perfil).
 
 ---
 
