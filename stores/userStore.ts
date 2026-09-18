@@ -58,6 +58,7 @@ export const useUserStore = create<UserState>()(
       name: 'kensei-user-storage',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({ 
+        profile: state.profile,
         remindersEnabled: state.remindersEnabled, 
         reminderTime: state.reminderTime,
         pendingOnboarding: state.pendingOnboarding,

@@ -43,16 +43,19 @@ export default function RootLayout() {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        loadUserData(session.user.id);
-      } else {
-        setIsLoading(false);
-      }
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        if (session?.user) {
+          loadUserData(session.user.id);
+        } else {
+          setIsLoading(false);
+        }
+      })
+      .catch(() => setIsLoading(false));
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION') return;
       setSession(session);
       if (session?.user) {
         loadUserData(session.user.id);
@@ -68,10 +71,13 @@ export default function RootLayout() {
 
   async function loadUserData(userId: string) {
     try {
+      const store = useUserStore.getState();
+      if (store.session?.user?.id !== userId) return;
       setDevMode(false);
-      const { pendingOnboarding, clearPendingOnboarding } = useUserStore.getState();
+      const { pendingOnboarding, clearPendingOnboarding } = store;
       if (pendingOnboarding) {
         const completedProfile = await completePendingOnboarding(userId, pendingOnboarding);
+        if (useUserStore.getState().session?.user?.id !== userId) return;
         setProfile(completedProfile);
         setPlan(pendingOnboarding.plan);
         setIsOnboarded(true);
@@ -81,11 +87,13 @@ export default function RootLayout() {
 
       const profile = await getUserProfile(userId);
       if (profile) {
+        if (useUserStore.getState().session?.user?.id !== userId) return;
         setProfile(profile);
         setIsOnboarded(true);
         const plan = await getActiveTrainingPlan(userId);
         if (plan) setPlan(plan);
       } else {
+        setProfile(null);
         setIsOnboarded(false);
       }
     } catch {
