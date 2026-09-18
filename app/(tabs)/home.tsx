@@ -108,7 +108,7 @@ export default function HomeScreen() {
           <Card className="mb-4">
             <View className="items-center py-6">
               <View className="w-12 h-12 rounded-xl bg-[#1A1A1A] items-center justify-center mb-3">
-                <Text className="text-2xl">💪</Text>
+                <Ionicons name="fitness-outline" size={24} color="#666666" />
               </View>
               <Text className="text-[#666666] text-sm text-center">
                 No hay sesion programada para hoy
@@ -144,7 +144,7 @@ export default function HomeScreen() {
           <Card>
             <View className="items-center py-6">
               <View className="w-12 h-12 rounded-xl bg-[#1A1A1A] items-center justify-center mb-3">
-                <Text className="text-2xl">📋</Text>
+                <Ionicons name="clipboard-outline" size={24} color="#666666" />
               </View>
               <Text className="text-[#666666] text-sm text-center">
                 No tienes un plan activo

@@ -79,13 +79,11 @@ export default function QuestionnaireScreen() {
 
   function handleAnswer(value: string | number) {
     setAnswers(prev => ({ ...prev, [currentStep.key]: value } as QuestionnaireData));
-    if (step < STEPS.length - 1) setStep(step + 1);
-    else setStep(step + 1);
+    setStep(step + 1);
   }
 
   function handleNext() {
-    if (step < STEPS.length - 1) setStep(step + 1);
-    else setStep(step + 1);
+    setStep(step + 1);
   }
 
   function handleBack() {

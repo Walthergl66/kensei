@@ -21,30 +21,33 @@ const disciplineColors: Record<string, string> = {
   both: '#E8C547',
 };
 
-const MOCK_SESSIONS: Session[] = [
-  {
-    id: '1',
-    user_id: 'guest',
-    date: '2026-06-01',
-    discipline: 'boxing',
-    duration_minutes: 30,
-    rounds_completed: 3,
-    rating: 5,
-    notes: 'Excelente sesion de sparring técnico.',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    user_id: 'guest',
-    date: '2026-05-30',
-    discipline: 'mma',
-    duration_minutes: 45,
-    rounds_completed: 5,
-    rating: 4,
-    notes: 'Enfoque en grappling y derribos.',
-    created_at: new Date().toISOString(),
-  },
-];
+function getMockSessions(): Session[] {
+  const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString().split('T')[0];
+  return [
+    {
+      id: '1',
+      user_id: 'guest',
+      date: daysAgo(1),
+      discipline: 'boxing',
+      duration_minutes: 30,
+      rounds_completed: 3,
+      rating: 5,
+      notes: 'Excelente sesion de sparring técnico.',
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: '2',
+      user_id: 'guest',
+      date: daysAgo(3),
+      discipline: 'mma',
+      duration_minutes: 45,
+      rounds_completed: 5,
+      rating: 4,
+      notes: 'Enfoque en grappling y derribos.',
+      created_at: new Date().toISOString(),
+    },
+  ];
+}
 
 export default function HistoryScreen() {
   const { session, isDevMode } = useUserStore();
@@ -54,7 +57,7 @@ export default function HistoryScreen() {
 
   async function loadSessions() {
     if (isDevMode || !session?.user?.id) {
-      setSessions(MOCK_SESSIONS);
+      setSessions(getMockSessions());
       setLoadingError(false);
       return;
     }
