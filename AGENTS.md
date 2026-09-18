@@ -750,6 +750,32 @@ Se construyó la aplicación completa desde cero. Archivos creados:
 - [x] **BUG**: `saveUserProfile()` usaba `upsert` sin `onConflict`, por defecto apuntaba a la PK `id`; como la unicidad real es `user_id` (constraint `user_profile_user_id_key`), al guardar el perfil de un usuario que ya tenia fila rompia con `duplicate key value violates unique constraint`. Ahora usa `upsert({...}, { onConflict: 'user_id' })`.
 - [x] **BUG WEB**: `register.tsx` tambien dependia de `Alert.alert` (no-op en web); ahora muestra el error inline en rojo igual que el login.
 
+### 34. Auditoria completa y correccion de bugs (Septiembre 2026)
+- [x] **Google Gemini key**: formato `AQ.Ab8...` (parece token OAuth, no API key `AIza...`) — probablemente no funcione como fallback. La app usa Groq (`qwen/qwen3.8-27b`); si se quiere fallback a Gemini, regenerar una key real en aistudio.google.com/app/apikey.
+
+**Modelo de Groq**: `llama-3.3-70b-versatile` YA NO EXISTE en la API de Groq (404). Probados via API real: `openai/gpt-oss-120b` devuelve el contenido en el campo `reasoning` (rompe el parser), `qwen/qwen3.8-27b` devuelve `content` normal → modelo activo en `constants/index.ts` (`GROQ_MODEL`).
+
+**Commits de esta sesion (9):** `e524e57` (Groq qwen + pointerEvents + single-flight onboarding), `844a72e`, `beb2a79`, `ce3840d`, `7004766`, `64d8c26`, `1a9c273`, `23fecdb`.
+
+- [x] **CRITICO** `app/(tabs)/timer.tsx`: el timer se congelaba al volver de background. El intervalo se limpiaba en background pero nunca se recreaba (el efecto dependia solo de `status`). Ahora hay `resumeNonce` que fuerza la recreacion del intervalo al reanudar.
+- [x] **CRITICO** `components/timer/SessionSaveSheet.tsx`: el estado "saved" no tenia boton de salida — el usuario quedaba atrapado en la pantalla final. Se anade boton "Listo" que llama `onDiscard` (reinicia el timer y cierra el panel).
+- [x] **ALTO** `app/(tabs)/training.tsx`: si la IA fallaba, `setPlan(DEFAULT_PLAN)` destruia el plan activo del usuario. Ahora el plan vigente se conserva y el error se muestra inline (visibles en web tambien).
+- [x] **ALTO** `stores/userStore.ts` + `stores/trainingStore.ts`: el modo desarrollo perdia perfil y plan al reiniciar la app porque no se persistian. Ahora `profile` y `plan` se guardan en AsyncStorage (en modo real se sobreescriben al cargar desde Supabase).
+- [x] **ALTO** `app/_layout.tsx`: `getSession()` sin try/catch podia dejar el splash infinito. `onAuthStateChange` ahora salta el evento `INITIAL_SESSION` (getSession ya carga los datos → se evitaban peticiones duplicadas). `loadUserData()` aborta si la sesion cambio durante las peticiones (race con signOut) y limpia un perfil persistido obsoleto cuando el servidor no devuelve perfil.
+- [x] **ALTO** datos de sesion guardada: `discipline` guardaba `sessionSource` (nombre del tipo de sesion) y `plan_session_day` el tipo, corrompiendo el historial. `timerStore` ahora guarda `sessionDay` (via `startFromSession(config, sessionName, sessionDay)`); el timer usa `profile?.discipline || 'boxing'` para `discipline` y `sessionDay` para `plan_session_day`.
+- [x] **ALTO** `lib/agent.ts`: validacion profunda del JSON del LLM (`sanitizeTrainingPlan`). Antes solo se comprobaba `weekly_structure` no vacio. Ahora se sanitizan todos los campos (nombres, numeros, intensidad, ejercicios) con fallbacks seguros; si no queda ninguna sesion valida se lanza error claro. Parser mas robusto ante campos `number | null`, tipos erroneos, sesiones/ejercicios malformados.
+- [x] **MEDIO** `lib/notifications.ts` + `app/(tabs)/profile.tsx`: los recordatorios eran un stub que siempre devolvia `false` → el switch nunca podia activarse. Ahora `expo-notifications` programa una notificacion diaria real via **import dinamico** (en web devuelve `false` para no romper el bundle web). El toggle muestra error inline (web) o Alert (native) si no hay permiso.
+- [x] **MEDIO** `lib/utils.ts` (`confirmAction`): `Alert.alert` es no-op en web, asi que "Reiniciar onboarding" (profile) y "Eliminar timer" (timer) no hacian nada en el navegador. `confirmAction()` usa `window.confirm` en web y `Alert.alert` en native.
+- [x] **BAJO** `app/(auth)/register.tsx`: el rate limit 429 de Supabase en signup muestra ahora un mensaje claro ("espera unos minutos") en lugar del texto tecnico.
+- [x] **BAJO** `lib/onboarding.ts`: single-flight de `completePendingOnboarding` indexado por `userId` (antes una promesa global compartida).
+- [x] **BAJO** `app/(onboarding)/questionnaire.tsx`: ramas redundantes en `handleAnswer`/`handleNext` (los dos lados hacian lo mismo).
+- [x] **BAJO** `app/(tabs)/history.tsx`: `MOCK_SESSIONS` con fechas relativas (antes fechas fijas de junio que quedaban antiguas).
+- [x] **BAJO** `app/(tabs)/home.tsx`: estados vacios con emojis reemplazados por Ionicons (`fitness-outline`, `clipboard-outline`).
+
+**Verificacion**: `npx tsc --noEmit` sin errores; `expo export --platform web` compila (bundle sin `import.meta`; el fix de zustand CJS sigue vigente); `expo export --platform android` compila (bundle 4.99MB).
+
+**Pendiente en Supabase**: el usuario `diag.kensei.1789693270@proton.me` fue creado durante el diagnostico del login — borrarlo desde Authentication > Users. La confirmacion de email sigue activa (`mailer_autoconfirm: false`); para desarrollo se puede desactivar en Authentication > Settings > Disable email confirmation.
+
 ---
 
 *Ultima actualizacion: Septiembre 2026*
