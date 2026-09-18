@@ -14,7 +14,7 @@ import EmptyState from '@/components/ui/EmptyState';
 
 export default function TrainingScreen() {
   const { plan, setPlan } = useTrainingStore();
-  const { profile, session, isDevMode } = useUserStore();
+  const { profile, session, isDevMode, profileContext } = useUserStore();
   const [regenerating, setRegenerating] = useState(false);
   const [regenError, setRegenError] = useState<string | null>(null);
 
@@ -24,7 +24,7 @@ export default function TrainingScreen() {
     setRegenError(null);
 
     try {
-      const newPlan = await generateTrainingPlan(profile);
+      const newPlan = await generateTrainingPlan(profile, profileContext || undefined);
       
       if (!isDevMode && supabase && session?.user?.id) {
         await deactivateOtherPlans(session.user.id);

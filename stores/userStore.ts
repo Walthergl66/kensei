@@ -14,6 +14,7 @@ interface UserState {
   remindersEnabled: boolean;
   reminderTime: { hour: number; minute: number };
   pendingOnboarding: PendingOnboarding | null;
+  profileContext: string | null;
   setProfile: (profile: UserProfile | null) => void;
   setSession: (session: Session | null) => void;
   setIsLoading: (loading: boolean) => void;
@@ -22,6 +23,7 @@ interface UserState {
   setReminders: (enabled: boolean, time?: { hour: number; minute: number }) => void;
   setPendingOnboarding: (pending: PendingOnboarding | null) => void;
   clearPendingOnboarding: () => void;
+  setProfileContext: (context: string | null) => void;
   signOut: () => Promise<void>;
 }
 
@@ -36,6 +38,7 @@ export const useUserStore = create<UserState>()(
       remindersEnabled: false,
       reminderTime: { hour: 9, minute: 0 },
       pendingOnboarding: null,
+      profileContext: null,
       setProfile: (profile) => set({ profile }),
       setSession: (session) => set({ session }),
       setIsLoading: (isLoading) => set({ isLoading }),
@@ -47,6 +50,7 @@ export const useUserStore = create<UserState>()(
       })),
       setPendingOnboarding: (pendingOnboarding) => set({ pendingOnboarding }),
       clearPendingOnboarding: () => set({ pendingOnboarding: null }),
+      setProfileContext: (profileContext) => set({ profileContext }),
       signOut: async () => {
         if (supabase) {
           await supabase.auth.signOut();
@@ -63,7 +67,8 @@ export const useUserStore = create<UserState>()(
         reminderTime: state.reminderTime,
         pendingOnboarding: state.pendingOnboarding,
         isOnboarded: state.isOnboarded,
-        isDevMode: state.isDevMode
+        isDevMode: state.isDevMode,
+        profileContext: state.profileContext
       }),
     }
   )
