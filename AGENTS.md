@@ -789,6 +789,16 @@ Se construyó la aplicación completa desde cero. Archivos creados:
 - [x] **ERROR JSON** `lib/agent.ts`: el error "Unterminated string in JSON" era un JSON truncado del LLM. Fixes: Groq con `max_tokens: 8192`, `parsePlanJson` repara JSON cortado (cierra cadenas/llaves/trailing commas) y reintento unico con instruccion reforzada antes de fallar con mensaje amigable (sin filtrar el texto crudo de JSON.parse).
 - [x] Verificado: `npx tsc --noEmit` sin errores y `expo export --platform web` compila.
 
+### 37. Migracion de npm a pnpm (Septiembre 2026)
+- [x] **CAUSA**: `pnpm dlx expo start` descargaba la CLI latest (`@expo/cli@57`) mientras el proyecto es SDK 54 (CLI local `54.0.27`, RN `0.81.5`). La CLI 57 pide el subpath `react-native/rn-get-polyfills`, inexistente en RN 0.81 → `ERR_PACKAGE_PATH_NOT_EXPORTED` y bundling web caido. Regla: nunca usar `dlx` para Expo, siempre el binario local (`pnpm start` / `pnpm exec expo`).
+- [x] `.npmrc` (nuevo): `node-linker=hoisted` para que Metro resuelva un `node_modules` plano como npm. Evita EPERM de symlinks en Windows y errores de resolucion con expo-router/NativeWind.
+- [x] `package.json`: campo `packageManager` fijado a `pnpm@12.6.0`.
+- [x] `package-lock.json` eliminado; `pnpm-lock.yaml` generado desde instalacion limpia (`rm -rf node_modules` + `pnpm install`, 784 paquetes).
+- [x] `.gitignore`: ignora `pnpm-debug.*`.
+- [x] Comandos desde ahora: `pnpm install`, `pnpm start`, `pnpm exec expo start --web --port 8081`. No usar `pnpm dlx expo`.
+- [x] Verificado: `pnpm exec expo --version` → `54.0.27` (local, no 57); `pnpm exec tsc --noEmit` sin errores; `pnpm exec expo export --platform web` compila (el fix de zustand CJS en `metro.config.js` sigue vigente con pnpm).
+- [x] **NOTA**: durante la migracion una herramienta externa creo 2 auto-commits genericos sobre `package-lock.json`/`pnpm-lock.yaml`; se rehicieron con mensajes convencionales (`a9a822a`, `7597906`).
+
 ---
 
 *Ultima actualizacion: Septiembre 2026*
